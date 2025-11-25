@@ -154,6 +154,12 @@ const GAME_STATE = {
         });
     },
 
+    // Map supplier keys to freight rate port keys
+    supplierToPort: {
+        'PERUVIAN': 'CALLAO',
+        'CHILEAN': 'ANTOFAGASTA'
+    },
+
     /**
      * Purchase copper
      */
@@ -161,12 +167,13 @@ const GAME_STATE = {
         console.log('[TRADE] Purchasing', tonnage, 'MT from', supplier);
 
         const data = this.currentMonthData;
-        const supplierData = data.SUPPLIERS[supplier];
-        const destData = data.LOGISTICS.FREIGHT_RATES[supplier][destination];
+        const supplierData = data.MARKET_DEPTH.SUPPLY[supplier];
+        const portKey = this.supplierToPort[supplier];
+        const destData = data.LOGISTICS.FREIGHT_RATES[portKey][destination];
 
         // Calculate costs
-        const basePrice = exchange === 'LME' ? data.EXCHANGE_PRICES.LME.CASH : data.EXCHANGE_PRICES.COMEX.NEARBY;
-        const premium = supplierData.CURRENT_PRICE.PREMIUM;
+        const basePrice = exchange === 'LME' ? data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
+        const premium = supplierData.SUPPLIER_PREMIUM_USD || 0;
         const freight = shippingTerms === 'CIF' ? destData.CIF_RATE_USD_PER_TONNE : destData.FOB_RATE_USD_PER_TONNE;
 
         const pricePerMT = basePrice + premium + freight;
@@ -197,7 +204,7 @@ const GAME_STATE = {
             id: 'PHYS_' + Date.now(),
             type: 'BUY',
             supplier: supplier,
-            originPort: supplierData.PORT,
+            originPort: supplierData.ORIGIN_PORT,
             destination: destination,
             destinationPort: destData.PORT_NAME + ', ' + destData.COUNTRY,
             tonnage: tonnage,
@@ -227,8 +234,8 @@ const GAME_STATE = {
     /**
      * Sell copper
      */
-    sellCopper(positionId, buyerKey, tonnage) {
-        console.log('[TRADE] Selling', tonnage, 'MT to', buyerKey);
+    sellCopper(positionId, buyerIndex, tonnage) {
+        console.log('[TRADE] Selling', tonnage, 'MT to buyer index', buyerIndex);
 
         const position = this.physicalPositions.find(p => p.id === positionId);
         if (!position || position.status !== 'ARRIVED') {
@@ -242,12 +249,12 @@ const GAME_STATE = {
         }
 
         const data = this.currentMonthData;
-        const buyerData = data.BUYERS[buyerKey];
+        const buyerData = data.CLIENTS.OPPORTUNITIES[buyerIndex];
 
         // Calculate sale price
         const basePrice = position.exchange === 'LME' ?
-            data.EXCHANGE_PRICES.LME.CASH : data.EXCHANGE_PRICES.COMEX.NEARBY;
-        const premium = buyerData.PREMIUM;
+            data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
+        const premium = buyerData.REGIONAL_PREMIUM_USD || 0;
         const salePrice = basePrice + premium;
         const revenue = salePrice * tonnage;
 
@@ -283,7 +290,7 @@ const GAME_STATE = {
 
         const data = this.currentMonthData;
         const price = exchange === 'LME' ?
-            data.EXCHANGE_PRICES.LME[contract] : data.EXCHANGE_PRICES.COMEX[contract];
+            data.PRICING.LME[contract] : data.PRICING.COMEX[contract];
 
         const marginPerContract = 9000;
         const feePerContract = 25;
@@ -335,8 +342,8 @@ const GAME_STATE = {
 
         const data = this.currentMonthData;
         const currentPrice = position.exchange === 'LME' ?
-            data.EXCHANGE_PRICES.LME[position.contract] :
-            data.EXCHANGE_PRICES.COMEX[position.contract];
+            data.PRICING.LME[position.contract] :
+            data.PRICING.COMEX[position.contract];
 
         // Calculate P&L
         const contractSize = position.exchange === 'LME' ? 25 : 25; // 25 MT per contract
@@ -370,8 +377,8 @@ const GAME_STATE = {
             if (pos.status !== 'OPEN') return;
 
             const currentPrice = pos.exchange === 'LME' ?
-                data.EXCHANGE_PRICES.LME[pos.contract] :
-                data.EXCHANGE_PRICES.COMEX[pos.contract];
+                data.PRICING.LME[pos.contract] :
+                data.PRICING.COMEX[pos.contract];
 
             const contractSize = 25;
             const priceDiff = pos.direction === 'LONG' ?
@@ -390,6 +397,14 @@ const GAME_STATE = {
 // ============================================================
 
 const MarketsWidget = {
+    /**
+     * Map supplier keys to freight rate port keys
+     */
+    supplierToPort: {
+        'PERUVIAN': 'CALLAO',
+        'CHILEAN': 'ANTOFAGASTA'
+    },
+
     /**
      * Render the markets widget
      */
@@ -411,15 +426,25 @@ const MarketsWidget = {
         html += '<table class="market-table">';
         html += '<tr><th>Name</th><th>Port</th><th>Premium</th><th>Range</th><th></th></tr>';
 
-        for (const [key, supplier] of Object.entries(data.SUPPLIERS)) {
-            const premium = supplier.CURRENT_PRICE.PREMIUM;
+        for (const [key, supplier] of Object.entries(data.MARKET_DEPTH.SUPPLY)) {
+            if (key === 'TOTAL_MARKET_DEPTH_MT') continue; // Skip totals
+            const premium = supplier.SUPPLIER_PREMIUM_USD || 0;
             const premiumSign = premium >= 0 ? '+' : '';
+            // Determine tonnage range based on supplier type
+            let minMT, maxMT;
+            if (supplier.LTA_FIXED_MT) {
+                minMT = supplier.LTA_FIXED_MT;
+                maxMT = supplier.TOTAL_MAX_AVAILABLE_MT || supplier.LTA_FIXED_MT;
+            } else {
+                minMT = supplier.MIN_AVAILABLE_MT || 0;
+                maxMT = supplier.MAX_AVAILABLE_MT || 0;
+            }
             html += `
                 <tr>
-                    <td>${supplier.NAME}</td>
-                    <td>${supplier.PORT}</td>
+                    <td>${key}</td>
+                    <td>${supplier.ORIGIN_PORT}</td>
                     <td>${premiumSign}$${premium}/MT</td>
-                    <td>${supplier.CURRENT_PRICE.TONNAGE_RANGE_MT[0]}-${supplier.CURRENT_PRICE.TONNAGE_RANGE_MT[1]} MT</td>
+                    <td>${minMT}-${maxMT} MT</td>
                     <td><button class="trade-btn" onclick="TradePanel.openBuy('${key}')">BUY</button></td>
                 </tr>
             `;
@@ -432,44 +457,44 @@ const MarketsWidget = {
         html += '<table class="market-table">';
         html += '<tr><th>Region</th><th>Destination</th><th>Premium</th><th>Range</th><th></th></tr>';
 
-        for (const [key, buyer] of Object.entries(data.BUYERS)) {
-            const premium = buyer.PREMIUM;
+        data.CLIENTS.OPPORTUNITIES.forEach((buyer, index) => {
+            const premium = buyer.REGIONAL_PREMIUM_USD || 0;
             const premiumSign = premium >= 0 ? '+' : '';
             html += `
                 <tr>
-                    <td>${buyer.NAME}</td>
-                    <td>${buyer.DESTINATION}</td>
+                    <td>${buyer.REGION}</td>
+                    <td>${buyer.PORT_OF_DISCHARGE}</td>
                     <td>${premiumSign}$${premium}/MT</td>
-                    <td>${buyer.TONNAGE_RANGE_MT[0]}-${buyer.TONNAGE_RANGE_MT[1]} MT</td>
-                    <td><button class="trade-btn sell" onclick="TradePanel.openSell('${key}')">SELL</button></td>
+                    <td>${buyer.MIN_QUANTITY_MT}-${buyer.MAX_QUANTITY_MT} MT</td>
+                    <td><button class="trade-btn sell" onclick="TradePanel.openSell(${index})">SELL</button></td>
                 </tr>
             `;
-        }
+        });
         html += '</table></div>';
 
         // Exchange prices
         html += '<div class="markets-section">';
         html += '<h4>EXCHANGE PRICES</h4>';
         html += '<table class="market-table">';
-        html += '<tr><th>Exchange</th><th>Cash/Spot</th><th>M+1</th><th>M+2</th><th>M+3</th></tr>';
+        html += '<tr><th>Exchange</th><th>Spot</th><th>1M</th><th>3M</th><th>12M</th></tr>';
 
-        const lme = data.EXCHANGE_PRICES.LME;
-        const comex = data.EXCHANGE_PRICES.COMEX;
+        const lme = data.PRICING.LME;
+        const comex = data.PRICING.COMEX;
 
         html += `
             <tr>
                 <td>LME</td>
-                <td>$${lme.CASH}</td>
-                <td>$${lme['M+1']}</td>
-                <td>$${lme['M+2']}</td>
-                <td>$${lme['M+3']}</td>
+                <td>$${lme.SPOT_AVG}</td>
+                <td>$${lme.FUTURES_1M}</td>
+                <td>$${lme.FUTURES_3M}</td>
+                <td>$${lme.FUTURES_12M}</td>
             </tr>
             <tr>
                 <td>COMEX</td>
-                <td>$${comex.NEARBY}</td>
-                <td>$${comex['M+1']}</td>
-                <td>$${comex['M+2']}</td>
-                <td>$${comex['M+3']}</td>
+                <td>$${comex.SPOT_AVG}</td>
+                <td>$${comex.FUTURES_1M}</td>
+                <td>$${comex.FUTURES_3M}</td>
+                <td>$${comex.FUTURES_12M}</td>
             </tr>
         `;
         html += '</table></div>';
@@ -567,8 +592,16 @@ const PositionsWidget = {
 
 const FuturesWidget = {
     selectedExchange: 'LME',
-    selectedContract: 'M+1',
+    selectedContract: 'FUTURES_1M',
     selectedDirection: 'LONG',
+
+    // Map internal contract keys to display names
+    contractLabels: {
+        'SPOT_AVG': 'Spot',
+        'FUTURES_1M': '1M',
+        'FUTURES_3M': '3M',
+        'FUTURES_12M': '12M'
+    },
 
     /**
      * Render the futures widget
@@ -582,7 +615,7 @@ const FuturesWidget = {
         if (activeTab && activeTab.dataset.widget !== 'Futures') return;
 
         const data = GAME_STATE.currentMonthData;
-        if (!data) return;
+        if (!data || !data.PRICING) return;
 
         let html = '';
 
@@ -591,11 +624,12 @@ const FuturesWidget = {
         html += '<h4>LME COPPER</h4>';
         html += '<div class="futures-grid">';
 
-        ['CASH', 'M+1', 'M+2', 'M+3'].forEach(contract => {
-            const price = data.EXCHANGE_PRICES.LME[contract];
+        ['SPOT_AVG', 'FUTURES_1M', 'FUTURES_3M', 'FUTURES_12M'].forEach(contract => {
+            const price = data.PRICING.LME[contract];
+            const label = this.contractLabels[contract];
             html += `
                 <div class="futures-card">
-                    <div class="contract">${contract}</div>
+                    <div class="contract">${label}</div>
                     <div class="price">$${price.toLocaleString()}</div>
                     <div class="futures-btn-group">
                         <button class="futures-btn long" onclick="FuturesWidget.openPanel('LME', '${contract}', 'LONG')">LONG</button>
@@ -611,11 +645,12 @@ const FuturesWidget = {
         html += '<h4>COMEX COPPER</h4>';
         html += '<div class="futures-grid">';
 
-        ['NEARBY', 'M+1', 'M+2', 'M+3'].forEach(contract => {
-            const price = data.EXCHANGE_PRICES.COMEX[contract];
+        ['SPOT_AVG', 'FUTURES_1M', 'FUTURES_3M', 'FUTURES_12M'].forEach(contract => {
+            const price = data.PRICING.COMEX[contract];
+            const label = this.contractLabels[contract];
             html += `
                 <div class="futures-card">
-                    <div class="contract">${contract}</div>
+                    <div class="contract">${label}</div>
                     <div class="price">$${price.toLocaleString()}</div>
                     <div class="futures-btn-group">
                         <button class="futures-btn long" onclick="FuturesWidget.openPanel('COMEX', '${contract}', 'LONG')">LONG</button>
@@ -639,11 +674,11 @@ const FuturesWidget = {
 
         const data = GAME_STATE.currentMonthData;
         const price = exchange === 'LME' ?
-            data.EXCHANGE_PRICES.LME[contract] :
-            data.EXCHANGE_PRICES.COMEX[contract];
+            data.PRICING.LME[contract] :
+            data.PRICING.COMEX[contract];
 
         document.getElementById('futuresExchange').textContent = exchange;
-        document.getElementById('futuresContract').textContent = contract;
+        document.getElementById('futuresContract').textContent = this.contractLabels[contract];
         document.getElementById('futuresDirection').textContent = direction;
         document.getElementById('futuresPrice').textContent = '$' + price.toLocaleString();
 
@@ -899,10 +934,10 @@ const AnalyticsWidget = {
         const comexData = [];
 
         GAME_STATE.allMonthData.forEach(data => {
-            if (data) {
+            if (data && data.PRICING) {
                 labels.push(data.MONTH.substring(0, 3));
-                lmeData.push(data.EXCHANGE_PRICES.LME.CASH);
-                comexData.push(data.EXCHANGE_PRICES.COMEX.NEARBY);
+                lmeData.push(data.PRICING.LME.SPOT_AVG);
+                comexData.push(data.PRICING.COMEX.SPOT_AVG);
             }
         });
 
@@ -918,14 +953,14 @@ const AnalyticsWidget = {
                 labels: labels,
                 datasets: [
                     {
-                        label: 'LME Cash',
+                        label: 'LME Spot',
                         data: lmeData,
                         borderColor: '#3b82f6',
                         backgroundColor: 'transparent',
                         tension: 0.3
                     },
                     {
-                        label: 'COMEX Nearby',
+                        label: 'COMEX Spot',
                         data: comexData,
                         borderColor: '#f59e0b',
                         backgroundColor: 'transparent',
@@ -966,6 +1001,12 @@ const TradePanel = {
     currentBuyer: null,
     currentPosition: null,
 
+    // Map supplier keys to freight rate port keys
+    supplierToPort: {
+        'PERUVIAN': 'CALLAO',
+        'CHILEAN': 'ANTOFAGASTA'
+    },
+
     /**
      * Open buy panel
      */
@@ -973,25 +1014,35 @@ const TradePanel = {
         this.currentSupplier = supplierKey;
 
         const data = GAME_STATE.currentMonthData;
-        const supplier = data.SUPPLIERS[supplierKey];
+        const supplier = data.MARKET_DEPTH.SUPPLY[supplierKey];
+        const premium = supplier.SUPPLIER_PREMIUM_USD || 0;
 
         // Populate panel
-        document.getElementById('buySupplier').textContent = supplier.NAME;
-        document.getElementById('buyPort').textContent = supplier.PORT;
+        document.getElementById('buySupplier').textContent = supplierKey;
+        document.getElementById('buyPort').textContent = supplier.ORIGIN_PORT;
         document.getElementById('buyPremium').textContent =
-            (supplier.CURRENT_PRICE.PREMIUM >= 0 ? '+' : '') + '$' + supplier.CURRENT_PRICE.PREMIUM + '/MT';
+            (premium >= 0 ? '+' : '') + '$' + premium + '/MT';
 
-        const range = supplier.CURRENT_PRICE.TONNAGE_RANGE_MT;
-        document.getElementById('buyTonnage').min = range[0];
-        document.getElementById('buyTonnage').max = range[1];
-        document.getElementById('buyTonnage').value = range[0];
-        document.getElementById('buyRange').textContent = `Range: ${range[0]}-${range[1]} MT`;
+        // Determine tonnage range based on supplier type
+        let minMT, maxMT;
+        if (supplier.LTA_FIXED_MT) {
+            minMT = supplier.LTA_FIXED_MT;
+            maxMT = supplier.TOTAL_MAX_AVAILABLE_MT || supplier.LTA_FIXED_MT;
+        } else {
+            minMT = supplier.MIN_AVAILABLE_MT || 5;
+            maxMT = supplier.MAX_AVAILABLE_MT || 100;
+        }
+        document.getElementById('buyTonnage').min = minMT;
+        document.getElementById('buyTonnage').max = maxMT;
+        document.getElementById('buyTonnage').value = minMT;
+        document.getElementById('buyRange').textContent = `Range: ${minMT}-${maxMT} MT`;
 
         // Populate destinations
         const destSelect = document.getElementById('buyDestination');
         destSelect.innerHTML = '<option value="">Select destination...</option>';
 
-        const freightData = data.LOGISTICS.FREIGHT_RATES[supplierKey];
+        const portKey = this.supplierToPort[supplierKey];
+        const freightData = data.LOGISTICS.FREIGHT_RATES[portKey];
         for (const [destKey, dest] of Object.entries(freightData)) {
             destSelect.innerHTML += `<option value="${destKey}">${dest.PORT_NAME}, ${dest.COUNTRY}</option>`;
         }
@@ -1010,7 +1061,7 @@ const TradePanel = {
         const data = GAME_STATE.currentMonthData;
         if (!this.currentSupplier || !data) return;
 
-        const supplier = data.SUPPLIERS[this.currentSupplier];
+        const supplier = data.MARKET_DEPTH.SUPPLY[this.currentSupplier];
         const tonnage = parseInt(document.getElementById('buyTonnage').value) || 0;
         const exchange = document.getElementById('buyExchange').value;
         const destKey = document.getElementById('buyDestination').value;
@@ -1018,18 +1069,19 @@ const TradePanel = {
 
         // Base price
         const basePrice = exchange === 'LME' ?
-            data.EXCHANGE_PRICES.LME.CASH : data.EXCHANGE_PRICES.COMEX.NEARBY;
+            data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
         document.getElementById('buyBasePrice').textContent = '$' + basePrice + '/MT';
 
         // Premium
-        const premium = supplier.CURRENT_PRICE.PREMIUM;
+        const premium = supplier.SUPPLIER_PREMIUM_USD || 0;
         document.getElementById('buyPremiumCost').textContent =
             (premium >= 0 ? '+' : '') + '$' + premium + '/MT';
 
         // Freight
         let freight = 0;
         if (destKey) {
-            const dest = data.LOGISTICS.FREIGHT_RATES[this.currentSupplier][destKey];
+            const portKey = this.supplierToPort[this.currentSupplier];
+            const dest = data.LOGISTICS.FREIGHT_RATES[portKey][destKey];
             freight = shipping === 'CIF' ? dest.CIF_RATE_USD_PER_TONNE : dest.FOB_RATE_USD_PER_TONNE;
         }
         document.getElementById('buyFreight').textContent = '$' + freight + '/MT';
@@ -1071,16 +1123,17 @@ const TradePanel = {
     /**
      * Open sell panel
      */
-    openSell(buyerKey) {
-        this.currentBuyer = buyerKey;
+    openSell(buyerIndex) {
+        this.currentBuyer = buyerIndex;
 
         const data = GAME_STATE.currentMonthData;
-        const buyer = data.BUYERS[buyerKey];
+        const buyer = data.CLIENTS.OPPORTUNITIES[buyerIndex];
+        const premium = buyer.REGIONAL_PREMIUM_USD || 0;
 
-        document.getElementById('sellBuyer').textContent = buyer.NAME;
-        document.getElementById('sellDest').textContent = buyer.DESTINATION;
+        document.getElementById('sellBuyer').textContent = buyer.REGION;
+        document.getElementById('sellDest').textContent = buyer.PORT_OF_DISCHARGE;
         document.getElementById('sellPremiumInfo').textContent =
-            (buyer.PREMIUM >= 0 ? '+' : '') + '$' + buyer.PREMIUM + '/MT';
+            (premium >= 0 ? '+' : '') + '$' + premium + '/MT';
 
         // Populate inventory
         this.populateInventory();
@@ -1098,14 +1151,14 @@ const TradePanel = {
 
         // Find a buyer (use first available)
         const data = GAME_STATE.currentMonthData;
-        const buyerKey = Object.keys(data.BUYERS)[0];
-        this.currentBuyer = buyerKey;
+        this.currentBuyer = 0; // Use first buyer (index 0)
 
-        const buyer = data.BUYERS[buyerKey];
-        document.getElementById('sellBuyer').textContent = buyer.NAME;
-        document.getElementById('sellDest').textContent = buyer.DESTINATION;
+        const buyer = data.CLIENTS.OPPORTUNITIES[0];
+        const premium = buyer.REGIONAL_PREMIUM_USD || 0;
+        document.getElementById('sellBuyer').textContent = buyer.REGION;
+        document.getElementById('sellDest').textContent = buyer.PORT_OF_DISCHARGE;
         document.getElementById('sellPremiumInfo').textContent =
-            (buyer.PREMIUM >= 0 ? '+' : '') + '$' + buyer.PREMIUM + '/MT';
+            (premium >= 0 ? '+' : '') + '$' + premium + '/MT';
 
         // Populate inventory with this position selected
         this.populateInventory(positionId);
@@ -1140,20 +1193,21 @@ const TradePanel = {
      */
     updateSellCalc() {
         const data = GAME_STATE.currentMonthData;
-        if (!this.currentBuyer || !data) return;
+        if (this.currentBuyer === null || !data) return;
 
-        const buyer = data.BUYERS[this.currentBuyer];
+        const buyer = data.CLIENTS.OPPORTUNITIES[this.currentBuyer];
         const positionId = document.getElementById('sellInventory').value;
         const position = GAME_STATE.physicalPositions.find(p => p.id === positionId);
         const tonnage = parseInt(document.getElementById('sellTonnage').value) || 0;
 
         // Sale price
-        let basePrice = data.EXCHANGE_PRICES.LME.CASH; // Default
+        let basePrice = data.PRICING.LME.SPOT_AVG; // Default
         if (position) {
             basePrice = position.exchange === 'LME' ?
-                data.EXCHANGE_PRICES.LME.CASH : data.EXCHANGE_PRICES.COMEX.NEARBY;
+                data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
         }
-        const salePrice = basePrice + buyer.PREMIUM;
+        const premium = buyer.REGIONAL_PREMIUM_USD || 0;
+        const salePrice = basePrice + premium;
         document.getElementById('sellPrice').textContent = '$' + salePrice + '/MT';
 
         // Revenue
