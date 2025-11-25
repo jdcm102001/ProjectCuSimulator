@@ -316,26 +316,63 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
 
     /**
      * Render M+1 Repricing Status section
+     * Tracks BOTH purchases AND sales - both use provisional pricing with M+1 reveal
      */
     renderM1RepricingStatus() {
-        // Check if repricing system exists
+        // Check if repricing system exists (both purchases and sales)
         const repricingExists = typeof GAME_STATE !== 'undefined' &&
             Array.isArray(GAME_STATE.salesPendingQP) &&
-            Array.isArray(GAME_STATE.salesCompleted);
+            Array.isArray(GAME_STATE.salesCompleted) &&
+            Array.isArray(GAME_STATE.purchasesPendingQP) &&
+            Array.isArray(GAME_STATE.purchasesCompleted);
 
+        // Get all pending/completed data
         const pendingSales = GAME_STATE?.salesPendingQP || [];
         const completedSales = GAME_STATE?.salesCompleted || [];
+        const pendingPurchases = GAME_STATE?.purchasesPendingQP || [];
+        const completedPurchases = GAME_STATE?.purchasesCompleted || [];
         const currentTurn = typeof TimeManager !== 'undefined' ? TimeManager.currentTurn : 1;
 
-        // Calculate totals
-        let totalCredits = 0;
-        let totalDebits = 0;
+        // Calculate sales totals (credit = good, debit = bad for seller)
+        let salesCredits = 0;
+        let salesDebits = 0;
         completedSales.forEach(sale => {
             const adj = sale.adjustmentAmount || 0;
-            if (adj > 0) totalCredits += adj;
-            else totalDebits += Math.abs(adj);
+            if (adj > 0) salesCredits += adj;
+            else salesDebits += Math.abs(adj);
         });
 
+        // Calculate purchase totals (for buyer: negative adjustment = cost went DOWN = good)
+        let purchaseSavings = 0;  // Negative cost adjustments (good for buyer)
+        let purchaseOverages = 0; // Positive cost adjustments (bad for buyer)
+        completedPurchases.forEach(purchase => {
+            const adj = purchase.costAdjustment || 0;
+            if (adj < 0) purchaseSavings += Math.abs(adj);  // Cost went down
+            else purchaseOverages += adj;                    // Cost went up
+        });
+
+        // Build pending purchases HTML
+        let pendingPurchasesHtml = '';
+        if (pendingPurchases.length === 0) {
+            pendingPurchasesHtml = '<span class="status-info">No purchases pending QP reveal</span>';
+        } else {
+            pendingPurchases.forEach(purchase => {
+                const qpMonth = TimeManager.MONTHS[purchase.qpMonthIndex] || 'N/A';
+                pendingPurchasesHtml += `
+┌ ${purchase.id}: ${purchase.tonnage} MT from ${purchase.supplier}
+│ Purchased: ${purchase.purchaseMonth} ${purchase.purchasePeriod} (Turn ${purchase.purchaseTurn})
+│ QP Reveal: ${qpMonth} Early
+│ Prov Base: $${purchase.provisionalBasePrice?.toLocaleString()}/MT
+│ Premium: $${purchase.premium?.toLocaleString()}/MT (FIXED)
+│ Freight: $${purchase.freight?.toLocaleString()}/MT (FIXED)
+│ Prov Total: $${purchase.pricePerMT?.toLocaleString()}/MT
+│ Prov Cost: $${purchase.totalCost?.toLocaleString()}
+└─────────────────────────────────────
+`;
+            });
+        }
+
+        // Build pending sales HTML
         let pendingSalesHtml = '';
         if (pendingSales.length === 0) {
             pendingSalesHtml = '<span class="status-info">No sales pending QP reveal</span>';
@@ -347,16 +384,41 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
 │ Sold: ${sale.saleMonth} ${sale.salePeriod} (Turn ${sale.saleTurn})
 │ QP Reveal: ${qpMonth} Early
 │ Est Price: $${sale.estimatedSalePrice}/MT
-│ Est Revenue: $${sale.estimatedRevenue.toLocaleString()}
-│ Est Profit: <span class="${sale.estimatedProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.estimatedProfit.toLocaleString()}</span>
+│ Est Revenue: $${sale.estimatedRevenue?.toLocaleString()}
+│ Est Profit: <span class="${sale.estimatedProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.estimatedProfit?.toLocaleString()}</span>
 └─────────────────────────────────────
 `;
             });
         }
 
+        // Build completed purchases HTML
+        let completedPurchasesHtml = '';
+        if (completedPurchases.length === 0) {
+            completedPurchasesHtml = '<span class="status-info">No completed purchase repricing yet</span>';
+        } else {
+            const recentPurchases = completedPurchases.slice(-3);
+            recentPurchases.forEach(purchase => {
+                const adjustment = purchase.costAdjustment || 0;
+                // For buyer: negative adjustment = cost went DOWN = good (green)
+                const adjClass = adjustment <= 0 ? 'status-good' : 'status-bad';
+                const adjSign = adjustment > 0 ? '+' : '';
+                completedPurchasesHtml += `
+┌ ${purchase.id}: ${purchase.tonnage} MT from ${purchase.supplier}
+│ Prov Base: $${purchase.provisionalBasePrice?.toLocaleString()}/MT → Act Base: $${purchase.actualBasePrice?.toLocaleString()}/MT
+│ Cost Adj: <span class="${adjClass}">${adjSign}$${adjustment.toLocaleString()}</span> ${adjustment > 0 ? '(cost UP)' : adjustment < 0 ? '(cost DOWN)' : '(no change)'}
+│ Final Cost: $${purchase.actualTotalCost?.toLocaleString()}
+└─────────────────────────────────────
+`;
+            });
+            if (completedPurchases.length > 3) {
+                completedPurchasesHtml += `  ... and ${completedPurchases.length - 3} more\n`;
+            }
+        }
+
+        // Build completed sales HTML
         let completedSalesHtml = '';
         if (completedSales.length === 0) {
-            completedSalesHtml = '<span class="status-info">No completed sales yet</span>';
+            completedSalesHtml = '<span class="status-info">No completed sale repricing yet</span>';
         } else {
             const recentSales = completedSales.slice(-3);
             recentSales.forEach(sale => {
@@ -366,7 +428,7 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
 ┌ ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
 │ Est: $${sale.estimatedSalePrice}/MT → Act: $${sale.actualSalePrice}/MT
 │ Adjustment: <span class="${adjClass}">${adjustment >= 0 ? '+' : ''}$${adjustment.toLocaleString()}</span>
-│ Final Profit: <span class="${sale.actualProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.actualProfit.toLocaleString()}</span>
+│ Final Profit: <span class="${sale.actualProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.actualProfit?.toLocaleString()}</span>
 └─────────────────────────────────────
 `;
             });
@@ -375,38 +437,53 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
             }
         }
 
-        // QP Reveal Status for each turn
-        const qpRevealStatus = this.getQPRevealStatus(currentTurn, completedSales);
+        // QP Reveal Status for each turn (now shows both purchases and sales)
+        const qpRevealStatus = this.getQPRevealStatus(currentTurn, completedSales, completedPurchases);
+
+        // Net impact calculation
+        const netSalesImpact = salesCredits - salesDebits;
+        const netPurchaseImpact = purchaseSavings - purchaseOverages; // Positive = good for buyer
+        const totalNetImpact = netSalesImpact + netPurchaseImpact;
 
         return `
             <div class="debug-section">
                 <h3>M+1 QUOTATIONAL PERIOD TRACKING</h3>
                 <pre>
-${this.statusIcon(repricingExists)} Repricing System Implemented: ${repricingExists ? '<span class="status-good">Yes</span>' : 'No'}
+${this.statusIcon(repricingExists)} Repricing System Implemented: ${repricingExists ? '<span class="status-good">Yes (Purchases + Sales)</span>' : 'Partial or No'}
 
 <span class="status-header">LOGIC VERIFICATION:</span>
-- Trade in Month X
-- Uses M+1 = Month X+1 average
+- Trade (purchase OR sale) in Month X
+- Uses M+1 = Month X+1 average for base price
 - Revealed at Turn = Early period of M+1
-- Provisional = Spot at trade time
-- Final = M+1 average
-- Adjustment = Final - Provisional (credit/debit)
+- Premium & Freight: FIXED (do not change)
+- Only BASE PRICE adjusts at reveal
+- Adjustment = Actual - Provisional
 
 <span class="status-header">QP REVEAL STATUS:</span>
 ${qpRevealStatus}
 
-<span class="status-header">PENDING ADJUSTMENTS:</span>
-- Positions awaiting M+1 reveal: ${pendingSales.length}
-- Estimated adjustment range: [unknown until reveal]
+<span class="status-header">═══ PURCHASES ═══</span>
+Pending QP Reveal: ${pendingPurchases.length}
+${pendingPurchasesHtml}
 
+Completed Repricing: ${completedPurchases.length}
+- Cost savings (price down): <span class="status-good">$${purchaseSavings.toLocaleString()}</span>
+- Cost overages (price up): <span class="status-bad">$${purchaseOverages.toLocaleString()}</span>
+- Net purchase impact: <span class="${netPurchaseImpact >= 0 ? 'status-good' : 'status-bad'}">$${netPurchaseImpact.toLocaleString()}</span>
+${completedPurchasesHtml}
+
+<span class="status-header">═══ SALES ═══</span>
+Pending QP Reveal: ${pendingSales.length}
 ${pendingSalesHtml}
 
-<span class="status-header">COMPLETED ADJUSTMENTS:</span>
-- Total credits issued: <span class="status-good">+$${totalCredits.toLocaleString()}</span>
-- Total debits issued: <span class="status-bad">-$${totalDebits.toLocaleString()}</span>
-- Net adjustment: <span class="${(totalCredits - totalDebits) >= 0 ? 'status-good' : 'status-bad'}">$${(totalCredits - totalDebits).toLocaleString()}</span>
-
+Completed Repricing: ${completedSales.length}
+- Credits received (price up): <span class="status-good">+$${salesCredits.toLocaleString()}</span>
+- Debits paid (price down): <span class="status-bad">-$${salesDebits.toLocaleString()}</span>
+- Net sales impact: <span class="${netSalesImpact >= 0 ? 'status-good' : 'status-bad'}">$${netSalesImpact.toLocaleString()}</span>
 ${completedSalesHtml}
+
+<span class="status-header">═══ TOTAL IMPACT ═══</span>
+Net M+1 Impact: <span class="${totalNetImpact >= 0 ? 'status-good' : 'status-bad'}">$${totalNetImpact.toLocaleString()}</span>
                 </pre>
             </div>
         `;
@@ -414,29 +491,31 @@ ${completedSalesHtml}
 
     /**
      * Get QP reveal status for each trigger turn
+     * Now tracks both purchases and sales repricing
      */
-    getQPRevealStatus(currentTurn, completedSales) {
+    getQPRevealStatus(currentTurn, completedSales, completedPurchases = []) {
         const reveals = [
-            { turn: 3, month: 'Feb', reveals: 'January M+1', reprices: 'January sales' },
-            { turn: 5, month: 'Mar', reveals: 'February M+1', reprices: 'February sales' },
-            { turn: 7, month: 'Apr', reveals: 'March M+1', reprices: 'March sales' },
-            { turn: 9, month: 'May', reveals: 'April M+1', reprices: 'April sales' },
-            { turn: 11, month: 'Jun', reveals: 'May M+1', reprices: 'May sales' }
+            { turn: 3, month: 'Feb', reveals: 'January M+1', tradeMonth: 'January' },
+            { turn: 5, month: 'Mar', reveals: 'February M+1', tradeMonth: 'February' },
+            { turn: 7, month: 'Apr', reveals: 'March M+1', tradeMonth: 'March' },
+            { turn: 9, month: 'May', reveals: 'April M+1', tradeMonth: 'April' },
+            { turn: 11, month: 'Jun', reveals: 'May M+1', tradeMonth: 'May' }
         ];
 
         let html = '';
         reveals.forEach(r => {
             let status = '';
             if (currentTurn > r.turn) {
-                // Check if any sales were repriced for this month
-                const repricedCount = completedSales.filter(s => {
-                    const monthMap = { 'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4 };
-                    const saleMonthName = r.reprices.split(' ')[0];
-                    return s.saleMonth === saleMonthName;
-                }).length;
-                status = repricedCount > 0
-                    ? `<span class="status-good">✅ Triggered (${repricedCount} sales repriced)</span>`
-                    : `<span class="status-good">✅ Triggered (no sales to reprice)</span>`;
+                // Check how many purchases and sales were repriced for this month
+                const repricedPurchases = completedPurchases.filter(p => p.purchaseMonth === r.tradeMonth).length;
+                const repricedSales = completedSales.filter(s => s.saleMonth === r.tradeMonth).length;
+                const totalRepriced = repricedPurchases + repricedSales;
+
+                if (totalRepriced > 0) {
+                    status = `<span class="status-good">✅ Triggered (${repricedPurchases}P/${repricedSales}S repriced)</span>`;
+                } else {
+                    status = `<span class="status-good">✅ Triggered (no trades to reprice)</span>`;
+                }
             } else if (currentTurn === r.turn) {
                 status = '<span class="status-warn">⚠️ TRIGGERING THIS TURN!</span>';
             } else {
@@ -445,7 +524,7 @@ ${completedSalesHtml}
             html += `
 ┌ Turn ${r.turn} (${r.month} Early):
 │ - Reveals: ${r.reveals}
-│ - Reprices: ${r.reprices}
+│ - Reprices: ${r.tradeMonth} trades (P+S)
 │ - Status: ${status}
 └─────────────────────────────────────
 `;

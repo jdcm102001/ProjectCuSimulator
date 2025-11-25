@@ -178,8 +178,11 @@ const GAME_STATE = {
         buyerData: null      // Full buyer data object
     },
 
-    // M+1 Repricing System: Sales pending QP (Quotational Period) reveal
-    // Sales are made with estimated price, actual price revealed at M+1
+    // M+1 Repricing System: Pending QP (Quotational Period) reveals
+    // Both purchases and sales use provisional price, actual revealed at M+1
+    // Premium and freight remain fixed - only base price adjusts
+    purchasesPendingQP: [],
+    purchasesCompleted: [],
     salesPendingQP: [],
     salesCompleted: [],
 
@@ -420,81 +423,172 @@ const GAME_STATE = {
     /**
      * Process QP (Quotational Period) reveals for M+1 repricing
      * Called at Early periods when entering a new month
-     * Reveals actual prices for sales made in the previous month
+     * Reveals actual prices for BOTH purchases AND sales made in the previous month
+     * Premium and freight remain FIXED - only base price adjusts
      * @param {number} currentMonthIndex - The current month index (0-5)
      */
     processQPReveals(currentMonthIndex) {
-        // Get the M+1 price data (current month = M+1 for sales made last month)
+        // Get the M+1 price data (current month = M+1 for trades made last month)
         const m1Data = this.allMonthData[currentMonthIndex];
         if (!m1Data || !m1Data.PRICING) {
             console.warn('[QP] No pricing data for M+1 month:', currentMonthIndex);
             return;
         }
 
-        // Find all sales pending QP reveal for this month
+        const monthName = TimeManager.getMonthPeriod().monthName;
+        let totalPurchaseAdjustment = 0;
+        let totalSaleAdjustment = 0;
+        let purchasesProcessed = 0;
+        let salesProcessed = 0;
+
+        // ========== PROCESS PURCHASES ==========
+        const purchasesToProcess = this.purchasesPendingQP.filter(
+            p => p.qpMonthIndex === currentMonthIndex && !p.qpRevealed
+        );
+
+        if (purchasesToProcess.length > 0) {
+            console.log(`[QP] Processing ${purchasesToProcess.length} purchases for M+1 repricing...`);
+
+            purchasesToProcess.forEach(purchase => {
+                // Get actual M+1 base price
+                const actualBasePrice = purchase.exchange === 'LME' ?
+                    m1Data.PRICING.LME.SPOT_AVG : m1Data.PRICING.COMEX.SPOT_AVG;
+
+                // Calculate actual cost (base + fixed premium + fixed freight)
+                const actualPricePerMT = actualBasePrice + purchase.premium + purchase.freight;
+                const actualTotalCost = actualPricePerMT * purchase.tonnage;
+
+                // Calculate adjustment (difference from provisional)
+                // Positive = cost went UP (bad for buyer), Negative = cost went DOWN (good for buyer)
+                const costAdjustment = actualTotalCost - purchase.provisionalTotalCost;
+
+                // Update the physical position
+                const position = this.physicalPositions.find(p => p.id === purchase.positionId);
+                if (position) {
+                    position.actualBasePrice = actualBasePrice;
+                    position.actualPricePerMT = actualPricePerMT;
+                    position.actualTotalCost = actualTotalCost;
+                    position.costAdjustment = costAdjustment;
+                    position.pricePerMT = actualPricePerMT;  // Update displayed price
+                    position.totalCost = actualTotalCost;    // Update displayed cost
+                    position.qpRevealed = true;
+                }
+
+                // Apply adjustment to funds (if cost went up, deduct more; if down, refund)
+                // Cost increase = we owe more = deduct from funds
+                // Cost decrease = we overpaid = refund to funds
+                if (costAdjustment > 0) {
+                    // Cost went up - deduct additional from funds/LOC
+                    if (costAdjustment <= this.practiceFunds) {
+                        this.practiceFunds -= costAdjustment;
+                    } else {
+                        const fromLOC = costAdjustment - this.practiceFunds;
+                        this.practiceFunds = 0;
+                        this.locUsed += fromLOC;
+                    }
+                } else {
+                    // Cost went down - refund to funds
+                    this.practiceFunds += Math.abs(costAdjustment);
+                }
+
+                totalPurchaseAdjustment += costAdjustment;
+                purchasesProcessed++;
+
+                console.log(`[QP] Purchase ${purchase.positionId} repriced:`);
+                console.log(`     Prov: $${purchase.provisionalBasePrice}/MT → Act: $${actualBasePrice}/MT`);
+                console.log(`     Cost Adjustment: ${costAdjustment >= 0 ? '+' : ''}$${costAdjustment.toLocaleString()}`);
+
+                // Mark as revealed and move to completed
+                purchase.actualBasePrice = actualBasePrice;
+                purchase.actualTotalCost = actualTotalCost;
+                purchase.adjustment = costAdjustment;
+                purchase.qpRevealed = true;
+                this.purchasesCompleted.push(purchase);
+            });
+
+            // Remove processed purchases from pending
+            this.purchasesPendingQP = this.purchasesPendingQP.filter(
+                p => p.qpMonthIndex !== currentMonthIndex || !p.qpRevealed
+            );
+        }
+
+        // ========== PROCESS SALES ==========
         const salesToProcess = this.salesPendingQP.filter(
             sale => sale.qpMonthIndex === currentMonthIndex && !sale.qpRevealed
         );
 
-        if (salesToProcess.length === 0) {
-            console.log('[QP] No sales pending QP reveal for month index:', currentMonthIndex);
-            return;
+        if (salesToProcess.length > 0) {
+            console.log(`[QP] Processing ${salesToProcess.length} sales for M+1 repricing...`);
+
+            salesToProcess.forEach(sale => {
+                // Get actual M+1 price
+                const actualBasePrice = sale.exchange === 'LME' ?
+                    m1Data.PRICING.LME.SPOT_AVG : m1Data.PRICING.COMEX.SPOT_AVG;
+
+                const actualSalePrice = actualBasePrice + sale.premium;
+                const actualRevenue = actualSalePrice * sale.tonnage;
+                const actualProfit = actualRevenue - sale.costBasis;
+
+                // Calculate adjustment (difference from estimate)
+                const adjustment = actualRevenue - sale.estimatedRevenue;
+                const profitAdjustment = actualProfit - sale.estimatedProfit;
+
+                // Update sale record
+                sale.actualBasePrice = actualBasePrice;
+                sale.actualSalePrice = actualSalePrice;
+                sale.actualRevenue = actualRevenue;
+                sale.actualProfit = actualProfit;
+                sale.adjustmentAmount = adjustment;
+                sale.qpRevealed = true;
+                sale.status = 'SETTLED';
+
+                // Apply adjustment to funds and P&L
+                this.practiceFunds += adjustment;
+                this.totalPL += profitAdjustment;
+                totalSaleAdjustment += adjustment;
+                salesProcessed++;
+
+                console.log(`[QP] Sale ${sale.id} repriced:`);
+                console.log(`     Est: $${sale.estimatedBasePrice}/MT → Act: $${actualBasePrice}/MT`);
+                console.log(`     Adjustment: $${adjustment.toLocaleString()}`);
+
+                // Move to completed sales
+                this.salesCompleted.push(sale);
+            });
+
+            // Remove processed sales from pending
+            this.salesPendingQP = this.salesPendingQP.filter(
+                sale => sale.qpMonthIndex !== currentMonthIndex || !sale.qpRevealed
+            );
         }
 
-        console.log(`[QP] Processing ${salesToProcess.length} sales for M+1 repricing...`);
+        // ========== NOTIFY USER ==========
+        if (purchasesProcessed > 0 || salesProcessed > 0) {
+            // Net effect on funds: sale adjustment is direct, purchase adjustment was already applied
+            // For purchases: positive adjustment = cost MORE = bad
+            // For sales: positive adjustment = received MORE = good
+            const netEffect = totalSaleAdjustment - totalPurchaseAdjustment;
 
-        let totalAdjustment = 0;
+            let message = `M+1 QP Reveal for ${monthName}:\n\n`;
 
-        salesToProcess.forEach(sale => {
-            // Get actual M+1 price
-            const actualBasePrice = sale.exchange === 'LME' ?
-                m1Data.PRICING.LME.SPOT_AVG : m1Data.PRICING.COMEX.SPOT_AVG;
+            if (purchasesProcessed > 0) {
+                const purchaseEffect = totalPurchaseAdjustment > 0 ? 'INCREASE' : 'DECREASE';
+                message += `Purchases: ${purchasesProcessed} repriced\n`;
+                message += `  Cost ${purchaseEffect}: ${totalPurchaseAdjustment >= 0 ? '+' : ''}$${totalPurchaseAdjustment.toLocaleString()}\n\n`;
+            }
 
-            const actualSalePrice = actualBasePrice + sale.premium;
-            const actualRevenue = actualSalePrice * sale.tonnage;
-            const actualProfit = actualRevenue - sale.costBasis;
+            if (salesProcessed > 0) {
+                const saleEffect = totalSaleAdjustment > 0 ? 'GAIN' : 'LOSS';
+                message += `Sales: ${salesProcessed} repriced\n`;
+                message += `  Revenue ${saleEffect}: ${totalSaleAdjustment >= 0 ? '+' : ''}$${totalSaleAdjustment.toLocaleString()}\n\n`;
+            }
 
-            // Calculate adjustment (difference from estimate)
-            const adjustment = actualRevenue - sale.estimatedRevenue;
-            const profitAdjustment = actualProfit - sale.estimatedProfit;
+            message += `Net Effect: ${netEffect >= 0 ? '+' : ''}$${netEffect.toLocaleString()}`;
 
-            // Update sale record
-            sale.actualBasePrice = actualBasePrice;
-            sale.actualSalePrice = actualSalePrice;
-            sale.actualRevenue = actualRevenue;
-            sale.actualProfit = actualProfit;
-            sale.adjustmentAmount = adjustment;
-            sale.qpRevealed = true;
-            sale.status = 'SETTLED';
-
-            // Apply adjustment to funds and P&L
-            this.practiceFunds += adjustment;
-            this.totalPL += profitAdjustment;
-            totalAdjustment += adjustment;
-
-            console.log(`[QP] Sale ${sale.id} repriced:`);
-            console.log(`     Est: $${sale.estimatedBasePrice}/MT → Act: $${actualBasePrice}/MT`);
-            console.log(`     Adjustment: $${adjustment.toLocaleString()}`);
-
-            // Move to completed sales
-            this.salesCompleted.push(sale);
-        });
-
-        // Remove processed sales from pending
-        this.salesPendingQP = this.salesPendingQP.filter(
-            sale => sale.qpMonthIndex !== currentMonthIndex || !sale.qpRevealed
-        );
-
-        // Notify user of total adjustment
-        if (totalAdjustment !== 0) {
-            const adjustmentType = totalAdjustment > 0 ? 'GAIN' : 'LOSS';
-            const monthName = TimeManager.getMonthPeriod().monthName;
-            console.log(`[QP] Total M+1 adjustment for ${monthName}: ${adjustmentType} $${Math.abs(totalAdjustment).toLocaleString()}`);
-
-            // Show notification to user
-            const message = `M+1 QP Reveal: ${salesToProcess.length} sale(s) repriced.\n` +
-                `Adjustment: ${totalAdjustment >= 0 ? '+' : ''}$${totalAdjustment.toLocaleString()}`;
+            console.log(`[QP] Total adjustments - Purchases: $${totalPurchaseAdjustment.toLocaleString()}, Sales: $${totalSaleAdjustment.toLocaleString()}`);
             alert(message);
+        } else {
+            console.log('[QP] No trades pending QP reveal for month index:', currentMonthIndex);
         }
     },
 
@@ -581,6 +675,9 @@ const GAME_STATE = {
 
     /**
      * Purchase copper
+     * M+1 Repricing: Purchases use PROVISIONAL base price (current spot).
+     * Actual base price is M+1 average, revealed at next month's Early period.
+     * Premium and freight remain FIXED - only base price adjusts.
      */
     purchaseCopper(supplier, tonnage, destination, exchange, shippingTerms) {
         console.log('[TRADE] Purchasing', tonnage, 'MT from', supplier);
@@ -589,6 +686,7 @@ const GAME_STATE = {
         const supplierData = data.MARKET_DEPTH.SUPPLY[supplier];
         const portKey = this.supplierToPort[supplier];
         const destData = data.LOGISTICS.FREIGHT_RATES[portKey][destination];
+        const timeInfo = TimeManager.getMonthPeriod();
 
         // Check monthly purchase limit
         const limitCheck = this.checkPurchaseLimit(portKey, tonnage);
@@ -597,17 +695,17 @@ const GAME_STATE = {
             return false;
         }
 
-        // Calculate costs
-        const basePrice = exchange === 'LME' ? data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
-        const premium = supplierData.SUPPLIER_PREMIUM_USD || 0;
-        const freight = shippingTerms === 'CIF' ? destData.CIF_RATE_USD_PER_TONNE : destData.FOB_RATE_USD_PER_TONNE;
+        // Calculate costs - base price is PROVISIONAL (current spot)
+        const provisionalBasePrice = exchange === 'LME' ? data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
+        const premium = supplierData.SUPPLIER_PREMIUM_USD || 0;  // FIXED - does not change
+        const freight = shippingTerms === 'CIF' ? destData.CIF_RATE_USD_PER_TONNE : destData.FOB_RATE_USD_PER_TONNE;  // FIXED
 
-        const pricePerMT = basePrice + premium + freight;
-        const totalCost = pricePerMT * tonnage;
+        const provisionalPricePerMT = provisionalBasePrice + premium + freight;
+        const provisionalTotalCost = provisionalPricePerMT * tonnage;
 
-        // Check funds
+        // Check funds (based on provisional cost)
         const availableFunds = this.practiceFunds + (this.lineOfCredit - this.locUsed);
-        if (totalCost > availableFunds) {
+        if (provisionalTotalCost > availableFunds) {
             alert('Insufficient funds!');
             return false;
         }
@@ -615,11 +713,11 @@ const GAME_STATE = {
         // Update monthly purchase limit
         this.monthlyPurchaseLimits[portKey].used += tonnage;
 
-        // Deduct funds
-        if (totalCost <= this.practiceFunds) {
-            this.practiceFunds -= totalCost;
+        // Deduct provisional funds
+        if (provisionalTotalCost <= this.practiceFunds) {
+            this.practiceFunds -= provisionalTotalCost;
         } else {
-            const fromLOC = totalCost - this.practiceFunds;
+            const fromLOC = provisionalTotalCost - this.practiceFunds;
             this.practiceFunds = 0;
             this.locUsed += fromLOC;
         }
@@ -627,12 +725,11 @@ const GAME_STATE = {
         // Calculate travel time using TimeManager
         const travelDays = destData.TRAVEL_TIME_DAYS;
         const arrivalTurn = TimeManager.calculateArrivalTurn(travelDays);
-        const timeInfo = TimeManager.getMonthPeriod();
 
         // Determine destination region for future sale matching
         const destinationRegion = this.destinationToRegion[destination] || 'UNKNOWN';
 
-        // Create position with enhanced location tracking
+        // Create position with M+1 pricing info
         const position = {
             id: 'PHYS_' + Date.now(),
             type: 'BUY',
@@ -647,10 +744,23 @@ const GAME_STATE = {
             tonnage: tonnage,
             exchange: exchange,
             shippingTerms: shippingTerms,
-            pricePerMT: pricePerMT,
-            totalCost: totalCost,
+            // M+1 Pricing - provisional values (base price will adjust)
+            provisionalBasePrice: provisionalBasePrice,
+            premium: premium,           // FIXED
+            freight: freight,           // FIXED
+            pricePerMT: provisionalPricePerMT,        // Will be updated at QP reveal
+            totalCost: provisionalTotalCost,          // Will be updated at QP reveal
+            // QP tracking
+            qpMonthIndex: timeInfo.monthIndex + 1,    // M+1
+            qpRevealed: false,
+            actualBasePrice: null,
+            actualPricePerMT: null,
+            actualTotalCost: null,
+            costAdjustment: null,
+            // Timing
             purchaseTurn: TimeManager.currentTurn,
             purchaseMonth: timeInfo.monthName,
+            purchaseMonthIndex: timeInfo.monthIndex,
             purchasePeriod: timeInfo.periodName,
             arrivalTurn: arrivalTurn,
             travelTimeDays: travelDays,
@@ -664,6 +774,40 @@ const GAME_STATE = {
         };
 
         this.physicalPositions.push(position);
+
+        // Check if this is June (no M+1 available) - settle immediately
+        if (timeInfo.monthIndex >= 5) {
+            position.actualBasePrice = provisionalBasePrice;
+            position.actualPricePerMT = provisionalPricePerMT;
+            position.actualTotalCost = provisionalTotalCost;
+            position.costAdjustment = 0;
+            position.qpRevealed = true;
+            this.purchasesCompleted.push({
+                positionId: position.id,
+                tonnage: tonnage,
+                provisionalBasePrice: provisionalBasePrice,
+                actualBasePrice: provisionalBasePrice,
+                adjustment: 0,
+                month: timeInfo.monthName
+            });
+            console.log('[TRADE] June purchase settled immediately:', position.id);
+        } else {
+            // Add to pending QP for M+1 repricing
+            this.purchasesPendingQP.push({
+                positionId: position.id,
+                tonnage: tonnage,
+                exchange: exchange,
+                provisionalBasePrice: provisionalBasePrice,
+                premium: premium,
+                freight: freight,
+                provisionalTotalCost: provisionalTotalCost,
+                purchaseMonth: timeInfo.monthName,
+                purchaseMonthIndex: timeInfo.monthIndex,
+                qpMonthIndex: timeInfo.monthIndex + 1,
+                qpRevealed: false
+            });
+            console.log('[TRADE] Purchase pending QP reveal at M+1:', position.id);
+        }
 
         // Update display
         this.updateHeader();
