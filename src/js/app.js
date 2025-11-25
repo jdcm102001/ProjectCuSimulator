@@ -178,6 +178,11 @@ const GAME_STATE = {
         buyerData: null      // Full buyer data object
     },
 
+    // M+1 Repricing System: Sales pending QP (Quotational Period) reveal
+    // Sales are made with estimated price, actual price revealed at M+1
+    salesPendingQP: [],
+    salesCompleted: [],
+
     // Month data array
     allMonthData: [],
     currentMonthData: null,
@@ -335,6 +340,10 @@ const GAME_STATE = {
 
             // Reset monthly purchase/sales limits
             this.resetMonthlyLimits();
+
+            // Process M+1 QP reveals for sales made last month
+            // Current month's price is the QP price for last month's sales
+            this.processQPReveals(result.details.monthIndex);
         }
 
         // Mark futures positions for settlement
@@ -393,6 +402,87 @@ const GAME_STATE = {
         }
 
         console.log('[GAME] Monthly purchase/sales limits reset');
+    },
+
+    /**
+     * Process QP (Quotational Period) reveals for M+1 repricing
+     * Called at Early periods when entering a new month
+     * Reveals actual prices for sales made in the previous month
+     * @param {number} currentMonthIndex - The current month index (0-5)
+     */
+    processQPReveals(currentMonthIndex) {
+        // Get the M+1 price data (current month = M+1 for sales made last month)
+        const m1Data = this.allMonthData[currentMonthIndex];
+        if (!m1Data || !m1Data.PRICING) {
+            console.warn('[QP] No pricing data for M+1 month:', currentMonthIndex);
+            return;
+        }
+
+        // Find all sales pending QP reveal for this month
+        const salesToProcess = this.salesPendingQP.filter(
+            sale => sale.qpMonthIndex === currentMonthIndex && !sale.qpRevealed
+        );
+
+        if (salesToProcess.length === 0) {
+            console.log('[QP] No sales pending QP reveal for month index:', currentMonthIndex);
+            return;
+        }
+
+        console.log(`[QP] Processing ${salesToProcess.length} sales for M+1 repricing...`);
+
+        let totalAdjustment = 0;
+
+        salesToProcess.forEach(sale => {
+            // Get actual M+1 price
+            const actualBasePrice = sale.exchange === 'LME' ?
+                m1Data.PRICING.LME.SPOT_AVG : m1Data.PRICING.COMEX.SPOT_AVG;
+
+            const actualSalePrice = actualBasePrice + sale.premium;
+            const actualRevenue = actualSalePrice * sale.tonnage;
+            const actualProfit = actualRevenue - sale.costBasis;
+
+            // Calculate adjustment (difference from estimate)
+            const adjustment = actualRevenue - sale.estimatedRevenue;
+            const profitAdjustment = actualProfit - sale.estimatedProfit;
+
+            // Update sale record
+            sale.actualBasePrice = actualBasePrice;
+            sale.actualSalePrice = actualSalePrice;
+            sale.actualRevenue = actualRevenue;
+            sale.actualProfit = actualProfit;
+            sale.adjustmentAmount = adjustment;
+            sale.qpRevealed = true;
+            sale.status = 'SETTLED';
+
+            // Apply adjustment to funds and P&L
+            this.practiceFunds += adjustment;
+            this.totalPL += profitAdjustment;
+            totalAdjustment += adjustment;
+
+            console.log(`[QP] Sale ${sale.id} repriced:`);
+            console.log(`     Est: $${sale.estimatedBasePrice}/MT → Act: $${actualBasePrice}/MT`);
+            console.log(`     Adjustment: $${adjustment.toLocaleString()}`);
+
+            // Move to completed sales
+            this.salesCompleted.push(sale);
+        });
+
+        // Remove processed sales from pending
+        this.salesPendingQP = this.salesPendingQP.filter(
+            sale => sale.qpMonthIndex !== currentMonthIndex || !sale.qpRevealed
+        );
+
+        // Notify user of total adjustment
+        if (totalAdjustment !== 0) {
+            const adjustmentType = totalAdjustment > 0 ? 'GAIN' : 'LOSS';
+            const monthName = TimeManager.getMonthPeriod().monthName;
+            console.log(`[QP] Total M+1 adjustment for ${monthName}: ${adjustmentType} $${Math.abs(totalAdjustment).toLocaleString()}`);
+
+            // Show notification to user
+            const message = `M+1 QP Reveal: ${salesToProcess.length} sale(s) repriced.\n` +
+                `Adjustment: ${totalAdjustment >= 0 ? '+' : ''}$${totalAdjustment.toLocaleString()}`;
+            alert(message);
+        }
     },
 
     /**
@@ -556,6 +646,8 @@ const GAME_STATE = {
 
     /**
      * Sell copper
+     * M+1 Repricing: Sales are recorded with ESTIMATED price based on current month.
+     * Actual QP price is revealed at the start of the next month (M+1).
      */
     sellCopper(positionId, buyerIndex, tonnage) {
         console.log('[TRADE] Selling', tonnage, 'MT to buyer index', buyerIndex);
@@ -573,6 +665,7 @@ const GAME_STATE = {
 
         const data = this.currentMonthData;
         const buyerData = data.CLIENTS.OPPORTUNITIES[buyerIndex];
+        const timeInfo = TimeManager.getMonthPeriod();
 
         // Map buyer region to sales limit region
         const buyerRegion = buyerData.REGION || 'AMERICAS';
@@ -585,23 +678,21 @@ const GAME_STATE = {
             return false;
         }
 
-        // Calculate sale price
-        const basePrice = position.exchange === 'LME' ?
+        // Calculate ESTIMATED sale price (current month's price)
+        const estimatedBasePrice = position.exchange === 'LME' ?
             data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
         const premium = buyerData.REGIONAL_PREMIUM_USD || 0;
-        const salePrice = basePrice + premium;
-        const revenue = salePrice * tonnage;
+        const estimatedSalePrice = estimatedBasePrice + premium;
+        const estimatedRevenue = estimatedSalePrice * tonnage;
 
-        // Calculate profit
+        // Calculate cost basis
         const costBasis = position.pricePerMT * tonnage;
-        const profit = revenue - costBasis;
+        const estimatedProfit = estimatedRevenue - costBasis;
 
         // Update monthly sales limit
         this.monthlySalesLimits[salesLimitRegion].used += tonnage;
 
-        // Update funds
-        this.practiceFunds += revenue;
-        this.totalPL += profit;
+        // Update inventory
         this.inventory -= tonnage;
 
         // Update position
@@ -611,17 +702,76 @@ const GAME_STATE = {
             position.tonnage -= tonnage;
         }
 
+        // Create sale record for M+1 repricing
+        const saleRecord = {
+            id: 'SALE_' + Date.now(),
+            positionId: positionId,
+            tonnage: tonnage,
+            buyer: buyerData.REGION,
+            buyerPort: buyerData.PORT_OF_DISCHARGE,
+            exchange: position.exchange,
+            premium: premium,
+            costBasis: costBasis,
+            pricePerMT: position.pricePerMT,
+            // Estimated values (based on current month)
+            estimatedBasePrice: estimatedBasePrice,
+            estimatedSalePrice: estimatedSalePrice,
+            estimatedRevenue: estimatedRevenue,
+            estimatedProfit: estimatedProfit,
+            // Sale timing info
+            saleTurn: TimeManager.currentTurn,
+            saleMonth: timeInfo.monthName,
+            saleMonthIndex: timeInfo.monthIndex,
+            salePeriod: timeInfo.periodName,
+            // QP info (to be revealed at M+1)
+            qpMonthIndex: timeInfo.monthIndex + 1, // M+1
+            qpRevealed: false,
+            // Actual values (set when QP revealed)
+            actualBasePrice: null,
+            actualSalePrice: null,
+            actualRevenue: null,
+            actualProfit: null,
+            adjustmentAmount: null,
+            status: 'PENDING_QP'
+        };
+
+        // Check if this is the last month (June) - no M+1 exists
+        if (timeInfo.monthIndex >= 5) {
+            // June sales settle at current price (no M+1)
+            saleRecord.actualBasePrice = estimatedBasePrice;
+            saleRecord.actualSalePrice = estimatedSalePrice;
+            saleRecord.actualRevenue = estimatedRevenue;
+            saleRecord.actualProfit = estimatedProfit;
+            saleRecord.adjustmentAmount = 0;
+            saleRecord.qpRevealed = true;
+            saleRecord.status = 'SETTLED';
+
+            // Immediate settlement for June
+            this.practiceFunds += estimatedRevenue;
+            this.totalPL += estimatedProfit;
+            this.salesCompleted.push(saleRecord);
+
+            console.log('[TRADE] June sale settled immediately:', saleRecord.id);
+        } else {
+            // M+1 repricing: Add to pending QP
+            // Credit estimated revenue now (will be adjusted at QP reveal)
+            this.practiceFunds += estimatedRevenue;
+            this.totalPL += estimatedProfit;
+            this.salesPendingQP.push(saleRecord);
+
+            console.log('[TRADE] Sale pending QP reveal at M+1:', saleRecord.id);
+            console.log('[TRADE] Estimated profit:', estimatedProfit, '(subject to QP adjustment)');
+        }
+
         // Update display
         this.updateHeader();
         PositionsWidget.render();
-
-        console.log('[TRADE] Sold for profit:', profit);
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
         if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
-        return profit;
+        return estimatedProfit;
     },
 
     /**

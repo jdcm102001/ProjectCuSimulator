@@ -287,26 +287,72 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
      */
     renderM1RepricingStatus() {
         // Check if repricing system exists
-        const repricingExists = typeof GAME_STATE !== 'undefined' && GAME_STATE.repricingHistory;
+        const repricingExists = typeof GAME_STATE !== 'undefined' &&
+            Array.isArray(GAME_STATE.salesPendingQP) &&
+            Array.isArray(GAME_STATE.salesCompleted);
+
+        const pendingSales = GAME_STATE?.salesPendingQP || [];
+        const completedSales = GAME_STATE?.salesCompleted || [];
+
+        let pendingSalesHtml = '';
+        if (pendingSales.length === 0) {
+            pendingSalesHtml = '<span class="status-info">No sales pending QP reveal</span>';
+        } else {
+            pendingSales.forEach(sale => {
+                const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
+                pendingSalesHtml += `
+- ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
+  Sold: ${sale.saleMonth} ${sale.salePeriod} (Turn ${sale.saleTurn})
+  QP Reveal: ${qpMonth} Early
+  Est Price: $${sale.estimatedSalePrice}/MT → Revenue: $${sale.estimatedRevenue.toLocaleString()}
+  Est Profit: <span class="${sale.estimatedProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.estimatedProfit.toLocaleString()}</span>
+`;
+            });
+        }
+
+        let completedSalesHtml = '';
+        if (completedSales.length === 0) {
+            completedSalesHtml = '<span class="status-info">No completed sales yet</span>';
+        } else {
+            // Show last 3 completed sales
+            const recentSales = completedSales.slice(-3);
+            recentSales.forEach(sale => {
+                const adjustment = sale.adjustmentAmount || 0;
+                const adjClass = adjustment >= 0 ? 'status-good' : 'status-bad';
+                completedSalesHtml += `
+- ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
+  Est: $${sale.estimatedSalePrice}/MT → Act: $${sale.actualSalePrice}/MT
+  Adjustment: <span class="${adjClass}">${adjustment >= 0 ? '+' : ''}$${adjustment.toLocaleString()}</span>
+  Final Profit: <span class="${sale.actualProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.actualProfit.toLocaleString()}</span>
+`;
+            });
+            if (completedSales.length > 3) {
+                completedSalesHtml += `\n  ... and ${completedSales.length - 3} more`;
+            }
+        }
 
         return `
             <div class="debug-section">
                 <h3>M+1 REPRICING STATUS</h3>
                 <pre>
-${this.statusIcon(repricingExists)} Repricing System Implemented: ${repricingExists ? 'Yes' : 'No (NOT YET)'}
+${this.statusIcon(repricingExists)} Repricing System Implemented: ${repricingExists ? '<span class="status-good">Yes</span>' : 'No'}
 
-Last QP Reveal: ${GAME_STATE?.lastQPReveal || 'None yet'}
-Positions Repriced: ${GAME_STATE?.positionsRepriced || 0}
+<span class="status-header">How M+1 Works</span>
+- Sales use current month's price as ESTIMATE
+- Actual price revealed at M+1 (next month Early)
+- Adjustment applied: actual - estimated
+
+<span class="status-header">Sales Pending QP (${pendingSales.length})</span>
+${pendingSalesHtml}
+<span class="status-header">Completed Sales (${completedSales.length})</span>
+${completedSalesHtml}
+<span class="status-header">QP Reveal Schedule</span>
 Next Reveal Due: ${this.getNextRevealTurn()}
-
-<span class="status-header">Upcoming Reveals Schedule</span>
-- Turn 3 (Feb Early): Reveals Jan M+1, reprices Dec sales
-- Turn 5 (Mar Early): Reveals Feb M+1, reprices Jan sales
-- Turn 7 (Apr Early): Reveals Mar M+1, reprices Feb sales
-- Turn 9 (May Early): Reveals Apr M+1, reprices Mar sales
-- Turn 11 (Jun Early): Reveals May M+1, reprices Apr sales
-
-<span class="status-warn">⚠️ Note: M+1 repricing not yet implemented</span>
+- Turn 3 (Feb Early): Reprices January sales
+- Turn 5 (Mar Early): Reprices February sales
+- Turn 7 (Apr Early): Reprices March sales
+- Turn 9 (May Early): Reprices April sales
+- Turn 11 (Jun Early): Reprices May sales
                 </pre>
             </div>
         `;
