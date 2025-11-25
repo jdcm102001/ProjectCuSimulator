@@ -163,31 +163,63 @@ ${this.statusIcon(boundaryOK)} isMonthBoundary() → ${isBoundary} (period=${tim
             positions.forEach((pos, i) => {
                 const hasOldFields = 'purchaseTurn' in pos && !('purchaseMonth' in pos && 'purchasePeriod' in pos);
                 const hasNewFields = 'purchaseMonth' in pos && 'purchasePeriod' in pos;
+                const hasLocationFields = 'currentLocation' in pos && 'currentRegion' in pos;
+
+                // Calculate QP info
+                const purchaseMonthIndex = TimeManager.MONTHS.indexOf(pos.purchaseMonth);
+                const qpMonthIndex = purchaseMonthIndex + 1; // M+1
+                const qpMonthName = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
+                const qpRevealTurn = (qpMonthIndex + 1) * 2 + 1; // Early period of M+2
 
                 positionHtml += `
-<div class="position-item">
-- ID: ${pos.id}
-- Purchase: ${pos.purchaseMonth || 'N/A'}, ${pos.purchasePeriod || 'N/A'} (Turn ${pos.purchaseTurn || 'N/A'})
-- Arrival: Turn ${pos.arrivalTurn || 'N/A'}
-- Status: <span class="status-${pos.status === 'ARRIVED' ? 'good' : 'info'}">${pos.status}</span>
-- Has OLD turn fields only?: ${this.statusIcon(!hasOldFields)} ${hasOldFields ? 'Yes (BAD!)' : 'No'}
-- Has NEW month/period fields?: ${this.statusIcon(hasNewFields)} ${hasNewFields ? 'Yes' : 'No (BAD!)'}
-${pos.status === 'SOLD' || pos.status === 'SOLD_PENDING' ? `
-- Sold: ${pos.soldMonth || 'N/A'}, ${pos.soldPeriod || 'N/A'}
-- Settlement: ${pos.settlementMonth || 'N/A'}, ${pos.settlementPeriod || 'N/A'}
-- QP Revealed?: ${pos.qpRevealed ? 'Yes' : 'No'}
-- Estimated Revenue: $${(pos.estimatedRevenue || 0).toLocaleString()}
-- Actual Revenue: $${(pos.actualRevenue || pos.estimatedRevenue || 0).toLocaleString()}
-` : ''}
-</div>`;
+┌─────────────────────────────────────
+│ <span class="status-header">Position ID: ${pos.id}</span>
+│ Status: <span class="status-${pos.status === 'ARRIVED' ? 'good' : pos.status === 'IN_TRANSIT' ? 'info' : 'warn'}">${pos.status}</span>
+│
+│ <span class="status-header">PURCHASE INFO:</span>
+│ - Tonnage: ${pos.tonnage} MT
+│ - Supplier: ${pos.supplier} (${pos.originPort})
+│ - Purchase: ${pos.purchaseMonth || 'N/A'} ${pos.purchasePeriod || ''} (Turn ${pos.purchaseTurn})
+│ - Destination: ${pos.destinationPortName || pos.destination} (${pos.destinationRegion || 'N/A'})
+│ - Arrival Due: Turn ${pos.arrivalTurn} (~${pos.travelTimeDays || 'N/A'} days)
+│ - Exchange: ${pos.exchange} | Terms: ${pos.shippingTerms}
+│ - Cost Basis: $${pos.pricePerMT?.toLocaleString()}/MT
+│ - Total Cost: $${pos.totalCost?.toLocaleString()}
+│
+│ <span class="status-header">LOCATION TRACKING:</span>
+│ - Current Location: ${pos.currentLocation || 'N/A'}
+│ - Current Port: ${pos.currentPort || pos.currentPortName || 'N/A'}
+│ - Current Region: ${pos.currentRegion || 'N/A'}
+│ ${hasLocationFields ? this.statusIcon(true) + ' Location fields present' : this.statusIcon(false) + ' Missing location fields!'}
+│
+│ <span class="status-header">TIMING VALIDATION:</span>
+│ ${this.statusIcon(!hasOldFields)} Has OLD turn fields only?: ${hasOldFields ? 'Yes (BAD!)' : 'No'}
+│ ${this.statusIcon(hasNewFields)} Has NEW month/period fields?: ${hasNewFields ? 'Yes' : 'No (BAD!)'}
+│
+│ <span class="status-header">QP INFO (for purchases):</span>
+│ - QP Basis: M+1 (${qpMonthName} average)
+│ - M+1 Reveal Due: Turn ${qpRevealTurn} (${qpMonthName} Early)
+└─────────────────────────────────────
+`;
             });
         }
 
+        // Count by status
+        const statusCounts = {
+            IN_TRANSIT: positions.filter(p => p.status === 'IN_TRANSIT').length,
+            ARRIVED: positions.filter(p => p.status === 'ARRIVED').length,
+            SOLD: positions.filter(p => p.status === 'SOLD').length
+        };
+
         return `
             <div class="debug-section">
-                <h3>POSITION TRACKING STATUS</h3>
+                <h3>PHYSICAL POSITIONS</h3>
                 <pre>
-Physical Positions: ${positions.length} total
+Total Positions: ${positions.length}
+- In Transit: ${statusCounts.IN_TRANSIT}
+- Arrived: ${statusCounts.ARRIVED}
+- Sold: ${statusCounts.SOLD}
+
 ${positionHtml}
                 </pre>
             </div>
@@ -293,6 +325,16 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
 
         const pendingSales = GAME_STATE?.salesPendingQP || [];
         const completedSales = GAME_STATE?.salesCompleted || [];
+        const currentTurn = typeof TimeManager !== 'undefined' ? TimeManager.currentTurn : 1;
+
+        // Calculate totals
+        let totalCredits = 0;
+        let totalDebits = 0;
+        completedSales.forEach(sale => {
+            const adj = sale.adjustmentAmount || 0;
+            if (adj > 0) totalCredits += adj;
+            else totalDebits += Math.abs(adj);
+        });
 
         let pendingSalesHtml = '';
         if (pendingSales.length === 0) {
@@ -301,11 +343,13 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
             pendingSales.forEach(sale => {
                 const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
                 pendingSalesHtml += `
-- ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
-  Sold: ${sale.saleMonth} ${sale.salePeriod} (Turn ${sale.saleTurn})
-  QP Reveal: ${qpMonth} Early
-  Est Price: $${sale.estimatedSalePrice}/MT → Revenue: $${sale.estimatedRevenue.toLocaleString()}
-  Est Profit: <span class="${sale.estimatedProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.estimatedProfit.toLocaleString()}</span>
+┌ ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
+│ Sold: ${sale.saleMonth} ${sale.salePeriod} (Turn ${sale.saleTurn})
+│ QP Reveal: ${qpMonth} Early
+│ Est Price: $${sale.estimatedSalePrice}/MT
+│ Est Revenue: $${sale.estimatedRevenue.toLocaleString()}
+│ Est Profit: <span class="${sale.estimatedProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.estimatedProfit.toLocaleString()}</span>
+└─────────────────────────────────────
 `;
             });
         }
@@ -314,48 +358,99 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
         if (completedSales.length === 0) {
             completedSalesHtml = '<span class="status-info">No completed sales yet</span>';
         } else {
-            // Show last 3 completed sales
             const recentSales = completedSales.slice(-3);
             recentSales.forEach(sale => {
                 const adjustment = sale.adjustmentAmount || 0;
                 const adjClass = adjustment >= 0 ? 'status-good' : 'status-bad';
                 completedSalesHtml += `
-- ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
-  Est: $${sale.estimatedSalePrice}/MT → Act: $${sale.actualSalePrice}/MT
-  Adjustment: <span class="${adjClass}">${adjustment >= 0 ? '+' : ''}$${adjustment.toLocaleString()}</span>
-  Final Profit: <span class="${sale.actualProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.actualProfit.toLocaleString()}</span>
+┌ ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
+│ Est: $${sale.estimatedSalePrice}/MT → Act: $${sale.actualSalePrice}/MT
+│ Adjustment: <span class="${adjClass}">${adjustment >= 0 ? '+' : ''}$${adjustment.toLocaleString()}</span>
+│ Final Profit: <span class="${sale.actualProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.actualProfit.toLocaleString()}</span>
+└─────────────────────────────────────
 `;
             });
             if (completedSales.length > 3) {
-                completedSalesHtml += `\n  ... and ${completedSales.length - 3} more`;
+                completedSalesHtml += `  ... and ${completedSales.length - 3} more\n`;
             }
         }
 
+        // QP Reveal Status for each turn
+        const qpRevealStatus = this.getQPRevealStatus(currentTurn, completedSales);
+
         return `
             <div class="debug-section">
-                <h3>M+1 REPRICING STATUS</h3>
+                <h3>M+1 QUOTATIONAL PERIOD TRACKING</h3>
                 <pre>
 ${this.statusIcon(repricingExists)} Repricing System Implemented: ${repricingExists ? '<span class="status-good">Yes</span>' : 'No'}
 
-<span class="status-header">How M+1 Works</span>
-- Sales use current month's price as ESTIMATE
-- Actual price revealed at M+1 (next month Early)
-- Adjustment applied: actual - estimated
+<span class="status-header">LOGIC VERIFICATION:</span>
+- Trade in Month X
+- Uses M+1 = Month X+1 average
+- Revealed at Turn = Early period of M+1
+- Provisional = Spot at trade time
+- Final = M+1 average
+- Adjustment = Final - Provisional (credit/debit)
 
-<span class="status-header">Sales Pending QP (${pendingSales.length})</span>
+<span class="status-header">QP REVEAL STATUS:</span>
+${qpRevealStatus}
+
+<span class="status-header">PENDING ADJUSTMENTS:</span>
+- Positions awaiting M+1 reveal: ${pendingSales.length}
+- Estimated adjustment range: [unknown until reveal]
+
 ${pendingSalesHtml}
-<span class="status-header">Completed Sales (${completedSales.length})</span>
+
+<span class="status-header">COMPLETED ADJUSTMENTS:</span>
+- Total credits issued: <span class="status-good">+$${totalCredits.toLocaleString()}</span>
+- Total debits issued: <span class="status-bad">-$${totalDebits.toLocaleString()}</span>
+- Net adjustment: <span class="${(totalCredits - totalDebits) >= 0 ? 'status-good' : 'status-bad'}">$${(totalCredits - totalDebits).toLocaleString()}</span>
+
 ${completedSalesHtml}
-<span class="status-header">QP Reveal Schedule</span>
-Next Reveal Due: ${this.getNextRevealTurn()}
-- Turn 3 (Feb Early): Reprices January sales
-- Turn 5 (Mar Early): Reprices February sales
-- Turn 7 (Apr Early): Reprices March sales
-- Turn 9 (May Early): Reprices April sales
-- Turn 11 (Jun Early): Reprices May sales
                 </pre>
             </div>
         `;
+    },
+
+    /**
+     * Get QP reveal status for each trigger turn
+     */
+    getQPRevealStatus(currentTurn, completedSales) {
+        const reveals = [
+            { turn: 3, month: 'Feb', reveals: 'January M+1', reprices: 'January sales' },
+            { turn: 5, month: 'Mar', reveals: 'February M+1', reprices: 'February sales' },
+            { turn: 7, month: 'Apr', reveals: 'March M+1', reprices: 'March sales' },
+            { turn: 9, month: 'May', reveals: 'April M+1', reprices: 'April sales' },
+            { turn: 11, month: 'Jun', reveals: 'May M+1', reprices: 'May sales' }
+        ];
+
+        let html = '';
+        reveals.forEach(r => {
+            let status = '';
+            if (currentTurn > r.turn) {
+                // Check if any sales were repriced for this month
+                const repricedCount = completedSales.filter(s => {
+                    const monthMap = { 'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4 };
+                    const saleMonthName = r.reprices.split(' ')[0];
+                    return s.saleMonth === saleMonthName;
+                }).length;
+                status = repricedCount > 0
+                    ? `<span class="status-good">✅ Triggered (${repricedCount} sales repriced)</span>`
+                    : `<span class="status-good">✅ Triggered (no sales to reprice)</span>`;
+            } else if (currentTurn === r.turn) {
+                status = '<span class="status-warn">⚠️ TRIGGERING THIS TURN!</span>';
+            } else {
+                status = '<span class="status-info">❌ Not yet reached</span>';
+            }
+            html += `
+┌ Turn ${r.turn} (${r.month} Early):
+│ - Reveals: ${r.reveals}
+│ - Reprices: ${r.reprices}
+│ - Status: ${status}
+└─────────────────────────────────────
+`;
+        });
+        return html;
     },
 
     /**
