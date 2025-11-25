@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data Load Test</title>
+    <script src="data/january.js"></script>
+</head>
+<body>
+    <h1>Data Load Diagnostic</h1>
+    <pre id="output"></pre>
+    <script>
+        const out = document.getElementById('output');
+
+        out.textContent = `
+=== DIAGNOSTIC RESULTS ===
+
+window.JANUARY_DATA exists: ${!!window.JANUARY_DATA}
+
+${window.JANUARY_DATA ? `
+JANUARY_DATA keys: ${JSON.stringify(Object.keys(window.JANUARY_DATA), null, 2)}
+
+MARKET_DEPTH exists: ${!!window.JANUARY_DATA.MARKET_DEPTH}
+MARKET_DEPTH.SUPPLY exists: ${!!window.JANUARY_DATA.MARKET_DEPTH?.SUPPLY}
+PRICING exists: ${!!window.JANUARY_DATA.PRICING}
+CLIENTS exists: ${!!window.JANUARY_DATA.CLIENTS}
+
+Sample data:
+- MONTH: ${window.JANUARY_DATA.MONTH}
+- LME Spot: ${window.JANUARY_DATA.PRICING?.LME?.SPOT_AVG}
+- Peruvian Port: ${window.JANUARY_DATA.MARKET_DEPTH?.SUPPLY?.PERUVIAN?.ORIGIN_PORT}
+` : 'JANUARY_DATA failed to load!'}
+
+=== If you see "failed to load", you need to run a web server ===
+Run this command in terminal:
+  cd /home/user/ProjectCuSimulator/src && python3 -m http.server 8000
+
+Then open: http://localhost:8000/test.html
+        `;
+    </script>
+</body>
+</html>
