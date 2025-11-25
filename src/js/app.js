@@ -141,6 +141,9 @@ const GAME_STATE = {
         AnalyticsWidget.render();
 
         console.log('[GAME] Now on turn', this.currentTurn, 'of', this.currentMonth);
+
+        // Update debug panel
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
     },
 
     /**
@@ -233,6 +236,10 @@ const GAME_STATE = {
         MapWidget.addShipment(position);
 
         console.log('[TRADE] Position created:', position.id);
+
+        // Update debug panel
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+
         return true;
     },
 
@@ -284,6 +291,10 @@ const GAME_STATE = {
         PositionsWidget.render();
 
         console.log('[TRADE] Sold for profit:', profit);
+
+        // Update debug panel
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+
         return profit;
     },
 
@@ -335,6 +346,10 @@ const GAME_STATE = {
         FuturesWidget.render();
 
         console.log('[FUTURES] Position opened:', position.id);
+
+        // Update debug panel
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+
         return true;
     },
 
@@ -369,6 +384,10 @@ const GAME_STATE = {
         FuturesWidget.render();
 
         console.log('[FUTURES] Position closed with P&L:', pl);
+
+        // Update debug panel
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+
         return pl;
     },
 
@@ -1361,7 +1380,195 @@ const SidebarManager = {
 
 
 // ============================================================
-// SECTION 10: INITIALIZATION
+// SECTION 10: DEBUG PANEL
+// ============================================================
+
+const DebugPanel = {
+    visible: false,
+    element: null,
+
+    /**
+     * Initialize debug panel
+     */
+    init() {
+        // Create debug panel element
+        this.element = document.createElement('div');
+        this.element.id = 'debugPanel';
+        this.element.innerHTML = `
+            <div class="debug-header">
+                <span>DEBUG PANEL</span>
+                <button onclick="DebugPanel.toggle()">×</button>
+            </div>
+            <div class="debug-content" id="debugContent"></div>
+        `;
+        document.body.appendChild(this.element);
+
+        // Add keyboard listener for ~ key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '`' || e.key === '~') {
+                this.toggle();
+            }
+        });
+
+        // Initial render
+        this.update();
+
+        console.log('[DEBUG] Debug panel initialized. Press ~ to toggle.');
+    },
+
+    /**
+     * Toggle visibility
+     */
+    toggle() {
+        this.visible = !this.visible;
+        this.element.style.display = this.visible ? 'block' : 'none';
+        if (this.visible) {
+            this.update();
+        }
+    },
+
+    /**
+     * Update debug panel content
+     */
+    update() {
+        if (!this.visible) return;
+
+        const content = document.getElementById('debugContent');
+        if (!content) return;
+
+        const data = GAME_STATE.currentMonthData;
+
+        let html = `
+<div class="debug-section">
+<h4>⏱ TIME SYSTEM</h4>
+<pre>
+Current Turn:   ${GAME_STATE.currentTurn} / 12
+Current Month:  ${GAME_STATE.currentMonth} (index: ${GAME_STATE.allMonthData.indexOf(GAME_STATE.currentMonthData)})
+Period:         ${GAME_STATE.currentTurn <= 6 ? 'Early' : 'Late'} (Turn ${GAME_STATE.currentTurn <= 6 ? GAME_STATE.currentTurn : GAME_STATE.currentTurn - 6}/6)
+</pre>
+</div>
+
+<div class="debug-section">
+<h4>💰 FINANCIAL</h4>
+<pre>
+Practice Funds: $${GAME_STATE.practiceFunds.toLocaleString()}
+LOC Limit:      $${GAME_STATE.lineOfCredit.toLocaleString()}
+LOC Used:       $${GAME_STATE.locUsed.toLocaleString()}
+LOC Available:  $${(GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
+Buying Power:   $${(GAME_STATE.practiceFunds + GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
+Total P&L:      $${GAME_STATE.totalPL.toLocaleString()}
+Inventory:      ${GAME_STATE.inventory} MT
+</pre>
+</div>
+
+<div class="debug-section">
+<h4>📦 PHYSICAL POSITIONS (${GAME_STATE.physicalPositions.length})</h4>
+<pre>${this.formatPositions()}</pre>
+</div>
+
+<div class="debug-section">
+<h4>📈 FUTURES POSITIONS (${GAME_STATE.futuresPositions.length})</h4>
+<pre>${this.formatFutures()}</pre>
+</div>
+
+<div class="debug-section">
+<h4>📊 CURRENT PRICES</h4>
+<pre>${this.formatPrices(data)}</pre>
+</div>
+
+<div class="debug-section">
+<h4>📁 DATA LOAD STATUS</h4>
+<pre>${this.formatDataStatus()}</pre>
+</div>
+`;
+
+        content.innerHTML = html;
+    },
+
+    /**
+     * Format physical positions
+     */
+    formatPositions() {
+        if (GAME_STATE.physicalPositions.length === 0) {
+            return '[No positions]';
+        }
+
+        return GAME_STATE.physicalPositions.map((pos, i) => {
+            return `#${i + 1} [${pos.status}]
+  ${pos.tonnage} MT | ${pos.supplier} → ${pos.destination}
+  Cost: $${pos.totalCost?.toLocaleString() || 'N/A'} ($${pos.pricePerMT}/MT)
+  Bought: Turn ${pos.purchaseTurn} | Arrives: Turn ${pos.arrivalTurn}`;
+        }).join('\n\n');
+    },
+
+    /**
+     * Format futures positions
+     */
+    formatFutures() {
+        if (GAME_STATE.futuresPositions.length === 0) {
+            return '[No futures]';
+        }
+
+        return GAME_STATE.futuresPositions.map((pos, i) => {
+            return `#${i + 1} [${pos.status}]
+  ${pos.exchange} ${pos.contract} | ${pos.direction} x${pos.contracts}
+  Entry: $${pos.entryPrice} | Current: $${pos.currentPrice || 'N/A'}
+  Unrealized P&L: $${pos.unrealizedPL?.toLocaleString() || '0'}`;
+        }).join('\n\n');
+    },
+
+    /**
+     * Format prices
+     */
+    formatPrices(data) {
+        if (!data || !data.PRICING) {
+            return '[No pricing data]';
+        }
+
+        return `LME:
+  Spot:  $${data.PRICING.LME.SPOT_AVG}
+  1M:    $${data.PRICING.LME.FUTURES_1M}
+  3M:    $${data.PRICING.LME.FUTURES_3M}
+  12M:   $${data.PRICING.LME.FUTURES_12M}
+
+COMEX:
+  Spot:  $${data.PRICING.COMEX.SPOT_AVG}
+  1M:    $${data.PRICING.COMEX.FUTURES_1M}
+  3M:    $${data.PRICING.COMEX.FUTURES_3M}
+  12M:   $${data.PRICING.COMEX.FUTURES_12M}`;
+    },
+
+    /**
+     * Format data load status
+     */
+    formatDataStatus() {
+        const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE'];
+        const globalData = [
+            window.JANUARY_DATA,
+            window.FEBRUARY_DATA,
+            window.MARCH_DATA,
+            window.APRIL_DATA,
+            window.MAY_DATA,
+            window.JUNE_DATA
+        ];
+
+        return months.map((name, i) => {
+            const data = globalData[i];
+            if (!data) return `❌ ${name}: NOT LOADED`;
+
+            const hasMarket = data.MARKET_DEPTH?.SUPPLY ? '✓' : '✗';
+            const hasPricing = data.PRICING?.LME ? '✓' : '✗';
+            const hasClients = data.CLIENTS?.OPPORTUNITIES ? '✓' : '✗';
+            const hasLogistics = data.LOGISTICS?.FREIGHT_RATES ? '✓' : '✗';
+
+            return `✅ ${name}: MARKET${hasMarket} PRICE${hasPricing} CLIENT${hasClients} LOGISTICS${hasLogistics}`;
+        }).join('\n');
+    }
+};
+
+
+// ============================================================
+// SECTION 11: INITIALIZATION
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1376,6 +1583,9 @@ document.addEventListener('DOMContentLoaded', () => {
     TabManager.init();
     SidebarManager.init();
 
+    // Initialize debug panel
+    DebugPanel.init();
+
     // Render initial widgets
     MarketsWidget.render();
     PositionsWidget.render();
@@ -1383,6 +1593,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize map
     MapWidget.init();
+
+    // Update debug panel after initial render
+    DebugPanel.update();
 
     // Set up event listeners
     document.getElementById('nextTurnBtn').addEventListener('click', () => {
