@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perseverance - Trading Simulator</title>
+
+    <!-- Single CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Mapbox GL JS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Game Data -->
+    <script src="data/january.js"></script>
+    <script src="data/february.js"></script>
+    <script src="data/march.js"></script>
+    <script src="data/april.js"></script>
+    <script src="data/may.js"></script>
+    <script src="data/june.js"></script>
+</head>
+<body>
+    <!-- HEADER BAR (Fixed, Static) -->
+    <header id="header">
+        <div class="metric">
+            <span class="label">Period</span>
+            <span class="value" id="headerPeriod">JAN - Early (1/12)</span>
+        </div>
+        <div class="metric">
+            <span class="label">Funds</span>
+            <span class="value" id="headerFunds">$200,000</span>
+        </div>
+        <div class="metric">
+            <span class="label">P&L</span>
+            <span class="value" id="headerPL">$0</span>
+        </div>
+        <div class="metric">
+            <span class="label">Buying Power</span>
+            <span class="value" id="headerBuyingPower">$400,000</span>
+        </div>
+        <div class="metric">
+            <span class="label">Inventory</span>
+            <span class="value" id="headerInventory">0 MT</span>
+        </div>
+        <div class="metric">
+            <span class="label">LOC Used</span>
+            <span class="value" id="headerLOC">$0 / $200K</span>
+        </div>
+        <button id="nextTurnBtn">NEXT TURN</button>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div id="container">
+        <!-- SIDEBAR (Static, No Collapse) -->
+        <aside id="sidebar">
+            <h3>Widgets</h3>
+            <ul id="widgetList">
+                <li data-widget="Markets">Markets</li>
+                <li data-widget="Positions">Positions</li>
+                <li data-widget="Futures">Futures</li>
+                <li data-widget="Map">Active Map</li>
+                <li data-widget="Analytics">Analytics</li>
+            </ul>
+        </aside>
+
+        <!-- WORKSPACE (2x2 Grid) -->
+        <main id="workspace">
+            <!-- Panel 1: Markets -->
+            <div class="panel" id="panel1">
+                <div class="panel-header">
+                    <div class="tabs">
+                        <button class="tab active" data-widget="Markets">Markets</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="content1">
+                    <!-- Markets widget renders here -->
+                </div>
+            </div>
+
+            <!-- Panel 2: Positions -->
+            <div class="panel" id="panel2">
+                <div class="panel-header">
+                    <div class="tabs">
+                        <button class="tab active" data-widget="Positions">Positions</button>
+                        <button class="tab" data-widget="Futures">Futures</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="content2">
+                    <!-- Positions/Futures widget renders here -->
+                </div>
+            </div>
+
+            <!-- Panel 3: Map -->
+            <div class="panel" id="panel3">
+                <div class="panel-header">
+                    <div class="tabs">
+                        <button class="tab active" data-widget="Map">Active Map</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="content3">
+                    <div id="mapContainer"></div>
+                </div>
+            </div>
+
+            <!-- Panel 4: Analytics -->
+            <div class="panel" id="panel4">
+                <div class="panel-header">
+                    <div class="tabs">
+                        <button class="tab active" data-widget="Analytics">Analytics</button>
+                    </div>
+                </div>
+                <div class="panel-content" id="content4">
+                    <div id="analyticsContainer">
+                        <canvas id="futuresChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- BUY PANEL (Simple Modal) -->
+    <div id="buyPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header">
+            <span>Buy Copper</span>
+            <button class="close-btn" onclick="TradePanel.close()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Supplier:</span>
+                <span class="value" id="buySupplier">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Port:</span>
+                <span class="value" id="buyPort">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Premium:</span>
+                <span class="value" id="buyPremium">-</span>
+            </div>
+            <div class="form-group">
+                <label>Tonnage (MT)</label>
+                <input type="number" id="buyTonnage" min="5" value="5">
+                <span id="buyRange" class="hint">Range: 5-17 MT</span>
+            </div>
+            <div class="form-group">
+                <label>Exchange</label>
+                <select id="buyExchange">
+                    <option value="LME">LME</option>
+                    <option value="COMEX">COMEX</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Destination</label>
+                <select id="buyDestination">
+                    <option value="">Select destination...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Shipping Terms</label>
+                <select id="buyShipping">
+                    <option value="FOB">FOB</option>
+                    <option value="CIF">CIF</option>
+                </select>
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>Base Price:</span>
+                    <span id="buyBasePrice">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>Premium:</span>
+                    <span id="buyPremiumCost">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>Freight:</span>
+                    <span id="buyFreight">$0</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Total Cost:</span>
+                    <span id="buyTotal">$0</span>
+                </div>
+            </div>
+            <button id="executeBuyBtn" onclick="TradePanel.executeBuy()">PURCHASE COPPER</button>
+        </div>
+    </div>
+
+    <!-- SELL PANEL (Simple Modal) -->
+    <div id="sellPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header sell">
+            <span>Sell Copper</span>
+            <button class="close-btn" onclick="TradePanel.close()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Buyer:</span>
+                <span class="value" id="sellBuyer">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Destination:</span>
+                <span class="value" id="sellDest">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Premium:</span>
+                <span class="value" id="sellPremiumInfo">-</span>
+            </div>
+            <div class="form-group">
+                <label>Select Inventory</label>
+                <select id="sellInventory">
+                    <option value="">No inventory available</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tonnage (MT)</label>
+                <input type="number" id="sellTonnage" min="5" value="5">
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>Sale Price:</span>
+                    <span id="sellPrice">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>Total Revenue:</span>
+                    <span id="sellRevenue">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>Original Cost:</span>
+                    <span id="sellCost">$0</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Profit:</span>
+                    <span id="sellProfit">$0</span>
+                </div>
+            </div>
+            <button id="executeSellBtn" onclick="TradePanel.executeSell()">SELL COPPER</button>
+        </div>
+    </div>
+
+    <!-- FUTURES PANEL -->
+    <div id="futuresPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header">
+            <span>Open Futures Position</span>
+            <button class="close-btn" onclick="FuturesWidget.closePanel()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Exchange:</span>
+                <span class="value" id="futuresExchange">LME</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Contract:</span>
+                <span class="value" id="futuresContract">M+1</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Direction:</span>
+                <span class="value" id="futuresDirection">LONG</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Price:</span>
+                <span class="value" id="futuresPrice">$0</span>
+            </div>
+            <div class="form-group">
+                <label>Number of Contracts</label>
+                <input type="number" id="futuresContracts" min="1" max="11" value="1">
+                <span class="hint">Max: 11 contracts (based on margin)</span>
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>Margin Required:</span>
+                    <span id="futuresMargin">$9,000</span>
+                </div>
+                <div class="calc-row">
+                    <span>Opening Fees:</span>
+                    <span id="futuresFees">$25</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Total Deducted:</span>
+                    <span id="futuresTotal">$9,025</span>
+                </div>
+            </div>
+            <button id="executeFuturesBtn" onclick="FuturesWidget.execute()">OPEN POSITION</button>
+        </div>
+    </div>
+
+    <!-- Main Application Script -->
+    <script src="js/app.js"></script>
+</body>
+</html>

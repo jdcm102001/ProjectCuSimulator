@@ -1,0 +1,589 @@
+/*
+ * Perseverance Trading Simulator
+ * Bare-bones CSS - No animations, no shadows, no gradients
+ * Priority: Functionality and Traceability
+ */
+
+/* ============ RESET ============ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ============ BASE ============ */
+body {
+    font-family: 'Courier New', Courier, monospace;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ============ HEADER ============ */
+#header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 20px;
+    background: #252525;
+    border-bottom: 1px solid #444;
+    height: 50px;
+}
+
+#header .metric {
+    display: flex;
+    flex-direction: column;
+}
+
+#header .metric .label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+#header .metric .value {
+    font-size: 14px;
+    color: #fff;
+    font-weight: bold;
+}
+
+#nextTurnBtn {
+    margin-left: auto;
+    padding: 8px 20px;
+    background: #333;
+    color: #4CAF50;
+    border: 1px solid #4CAF50;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+#nextTurnBtn:hover {
+    background: #4CAF50;
+    color: #000;
+}
+
+/* ============ CONTAINER ============ */
+#container {
+    display: flex;
+    height: calc(100vh - 50px);
+}
+
+/* ============ SIDEBAR ============ */
+#sidebar {
+    width: 150px;
+    background: #222;
+    border-right: 1px solid #444;
+    padding: 15px;
+}
+
+#sidebar h3 {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+#widgetList {
+    list-style: none;
+}
+
+#widgetList li {
+    padding: 8px 10px;
+    margin-bottom: 5px;
+    background: #333;
+    border: 1px solid #444;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+#widgetList li:hover {
+    border-color: #666;
+}
+
+/* ============ WORKSPACE ============ */
+#workspace {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 5px;
+    padding: 5px;
+    background: #1a1a1a;
+}
+
+/* ============ PANELS ============ */
+.panel {
+    background: #252525;
+    border: 1px solid #444;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel-header {
+    background: #2a2a2a;
+    border-bottom: 1px solid #444;
+    padding: 5px 10px;
+    min-height: 32px;
+}
+
+.panel-content {
+    flex: 1;
+    overflow: auto;
+    padding: 10px;
+}
+
+/* ============ TABS ============ */
+.tabs {
+    display: flex;
+    gap: 5px;
+}
+
+.tab {
+    padding: 5px 12px;
+    background: #333;
+    border: 1px solid #444;
+    color: #888;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+}
+
+.tab.active {
+    background: #444;
+    color: #fff;
+    border-color: #666;
+}
+
+/* ============ WIDGETS ============ */
+
+/* Markets Widget */
+.markets-section {
+    margin-bottom: 20px;
+}
+
+.markets-section h4 {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #444;
+}
+
+.market-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.market-table th {
+    text-align: left;
+    padding: 6px 8px;
+    background: #333;
+    color: #888;
+    border: 1px solid #444;
+}
+
+.market-table td {
+    padding: 6px 8px;
+    border: 1px solid #444;
+}
+
+.market-table tr:hover {
+    background: #2a2a2a;
+}
+
+.trade-btn {
+    padding: 4px 10px;
+    background: #333;
+    color: #4CAF50;
+    border: 1px solid #4CAF50;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: inherit;
+}
+
+.trade-btn.sell {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+.trade-btn:hover {
+    background: #4CAF50;
+    color: #000;
+}
+
+.trade-btn.sell:hover {
+    background: #f44336;
+    color: #fff;
+}
+
+/* Positions Widget */
+.positions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.positions-table th {
+    text-align: left;
+    padding: 6px 8px;
+    background: #333;
+    color: #888;
+    border: 1px solid #444;
+}
+
+.positions-table td {
+    padding: 6px 8px;
+    border: 1px solid #444;
+}
+
+.status-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+    background: #333;
+    border: 1px solid #666;
+}
+
+.status-badge.transit {
+    color: #2196F3;
+    border-color: #2196F3;
+}
+
+.status-badge.arrived {
+    color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+/* Futures Widget */
+.futures-section {
+    margin-bottom: 20px;
+}
+
+.futures-section h4 {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #444;
+}
+
+.futures-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.futures-card {
+    background: #333;
+    border: 1px solid #444;
+    padding: 10px;
+}
+
+.futures-card .contract {
+    font-size: 10px;
+    color: #888;
+}
+
+.futures-card .price {
+    font-size: 16px;
+    color: #fff;
+    font-weight: bold;
+}
+
+.futures-card .change {
+    font-size: 11px;
+}
+
+.futures-card .change.up {
+    color: #4CAF50;
+}
+
+.futures-card .change.down {
+    color: #f44336;
+}
+
+.futures-btn-group {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.futures-btn {
+    flex: 1;
+    padding: 5px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #888;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: inherit;
+}
+
+.futures-btn.long {
+    color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.futures-btn.short {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+/* Open Positions Table */
+.futures-positions {
+    margin-top: 15px;
+}
+
+/* Map Widget */
+#mapContainer {
+    width: 100%;
+    height: 100%;
+    min-height: 300px;
+    background: #1a1a1a;
+}
+
+/* Make sure Mapbox fills container */
+.mapboxgl-map {
+    width: 100%;
+    height: 100%;
+}
+
+.mapboxgl-canvas {
+    outline: none;
+}
+
+/* Port markers */
+.port-marker {
+    width: 10px;
+    height: 10px;
+    border: 2px solid #fff;
+}
+
+.port-hub {
+    background: #ff8c00;
+    border-radius: 50%;
+}
+
+.port-seller {
+    background: #ffd700;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.port-parity {
+    background: #3cb371;
+    border-radius: 50%;
+}
+
+.ship-marker {
+    font-size: 20px;
+}
+
+/* Map legend */
+.map-legend {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: #252525;
+    border: 1px solid #444;
+    padding: 10px;
+    font-size: 10px;
+}
+
+.map-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+/* Analytics Widget */
+#analyticsContainer {
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+}
+
+#futuresChart {
+    width: 100%;
+    height: 100%;
+}
+
+/* ============ TRADE PANELS (Modals) ============ */
+.trade-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    background: #252525;
+    border: 2px solid #4CAF50;
+    z-index: 1000;
+}
+
+.trade-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #444;
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.trade-panel-header.sell {
+    color: #f44336;
+}
+
+.trade-panel .close-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.trade-panel-body {
+    padding: 15px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #333;
+    font-size: 12px;
+}
+
+.info-row .label {
+    color: #888;
+}
+
+.info-row .value {
+    color: #fff;
+}
+
+.form-group {
+    margin: 12px 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 5px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px;
+    background: #333;
+    border: 1px solid #444;
+    color: #fff;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.form-group .hint {
+    font-size: 10px;
+    color: #666;
+}
+
+.calc-section {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    padding: 10px;
+    margin: 15px 0;
+}
+
+.calc-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 12px;
+    color: #888;
+}
+
+.calc-row.total {
+    border-top: 1px solid #444;
+    margin-top: 5px;
+    padding-top: 10px;
+    color: #fff;
+    font-weight: bold;
+}
+
+#executeBuyBtn,
+#executeSellBtn,
+#executeFuturesBtn {
+    width: 100%;
+    padding: 12px;
+    background: #333;
+    color: #4CAF50;
+    border: 2px solid #4CAF50;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#executeSellBtn {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+#executeBuyBtn:hover,
+#executeFuturesBtn:hover {
+    background: #4CAF50;
+    color: #000;
+}
+
+#executeSellBtn:hover {
+    background: #f44336;
+    color: #fff;
+}
+
+/* ============ UTILITIES ============ */
+.positive {
+    color: #4CAF50;
+}
+
+.negative {
+    color: #f44336;
+}
+
+/* Panel backdrop when modal is open */
+.backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 999;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #444;
+}
