@@ -656,16 +656,7 @@ const GAME_STATE = {
             this.monthlySalesLimits[region].used = 0;
         }
 
-        const monthName = TimeManager.getMonthPeriod().monthName;
         console.log('[GAME] Monthly purchase/sales limits reset');
-
-        // Send limits reset notification
-        NotificationManager.add(
-            'limits-reset',
-            'Monthly Limits Reset',
-            `Purchase and sale limits have reset for ${monthName}.`,
-            '🔄'
-        );
     },
 
     /**
@@ -746,10 +737,27 @@ const GAME_STATE = {
                 console.log(`     Prov: $${purchase.provisionalBasePrice}/MT → Act: $${actualBasePrice}/MT`);
                 console.log(`     Cost Adjustment: ${costAdjustment >= 0 ? '+' : ''}$${costAdjustment.toLocaleString()}`);
 
+                // Send notification for this purchase
+                if (costAdjustment > 0) {
+                    NotificationManager.add(
+                        'qp-debit',
+                        'QP Settlement: Letter of Debit',
+                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${purchase.purchaseMonth} purchase cost increased by $${costAdjustment.toLocaleString()}.`,
+                        '📉'
+                    );
+                } else if (costAdjustment < 0) {
+                    NotificationManager.add(
+                        'qp-credit',
+                        'QP Settlement: Letter of Credit',
+                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${purchase.purchaseMonth} purchase cost decreased - $${Math.abs(costAdjustment).toLocaleString()} refunded.`,
+                        '💰'
+                    );
+                }
+
                 // Mark as revealed and move to completed
                 purchase.actualBasePrice = actualBasePrice;
                 purchase.actualTotalCost = actualTotalCost;
-                purchase.adjustment = costAdjustment;
+                purchase.costAdjustment = costAdjustment;
                 purchase.qpRevealed = true;
                 this.purchasesCompleted.push(purchase);
             });
@@ -800,6 +808,23 @@ const GAME_STATE = {
                 console.log(`     Est: $${sale.estimatedBasePrice}/MT → Act: $${actualBasePrice}/MT`);
                 console.log(`     Adjustment: $${adjustment.toLocaleString()}`);
 
+                // Send notification for this sale
+                if (adjustment > 0) {
+                    NotificationManager.add(
+                        'qp-credit',
+                        'QP Settlement: Letter of Credit',
+                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale received +$${adjustment.toLocaleString()} credit.`,
+                        '💰'
+                    );
+                } else if (adjustment < 0) {
+                    NotificationManager.add(
+                        'qp-debit',
+                        'QP Settlement: Letter of Debit',
+                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale revenue decreased by $${Math.abs(adjustment).toLocaleString()}.`,
+                        '📉'
+                    );
+                }
+
                 // Move to completed sales
                 this.salesCompleted.push(sale);
             });
@@ -810,59 +835,9 @@ const GAME_STATE = {
             );
         }
 
-        // ========== SEND NOTIFICATIONS ==========
+        // Update UI if any trades were processed
         if (purchasesProcessed > 0 || salesProcessed > 0) {
             console.log(`[QP] Total adjustments - Purchases: $${totalPurchaseAdjustment.toLocaleString()}, Sales: $${totalSaleAdjustment.toLocaleString()}`);
-
-            // Get the M+1 price for notification messages
-            const m1Price = m1Data.PRICING.LME.SPOT_AVG;
-            const prevMonthName = TimeManager.MONTHS[currentMonthIndex - 1] || 'January';
-
-            // Add notifications for each purchase adjustment
-            this.purchasesCompleted.filter(p => p.qpRevealed && p.purchaseMonth === prevMonthName).forEach(purchase => {
-                const adj = purchase.costAdjustment || 0;
-                if (adj > 0) {
-                    // Cost went UP - Letter of Debit
-                    NotificationManager.add(
-                        'qp-debit',
-                        'QP Settlement: Letter of Debit',
-                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} purchase owes +$${adj.toLocaleString()} additional.`,
-                        '📉'
-                    );
-                } else if (adj < 0) {
-                    // Cost went DOWN - Letter of Credit (refund)
-                    NotificationManager.add(
-                        'qp-credit',
-                        'QP Settlement: Letter of Credit',
-                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} purchase received $${Math.abs(adj).toLocaleString()} credit.`,
-                        '💰'
-                    );
-                }
-            });
-
-            // Add notifications for each sale adjustment
-            this.salesCompleted.filter(s => s.qpRevealed && s.saleMonth === prevMonthName).forEach(sale => {
-                const adj = sale.adjustmentAmount || 0;
-                if (adj > 0) {
-                    // Revenue went UP - Letter of Credit
-                    NotificationManager.add(
-                        'qp-credit',
-                        'QP Settlement: Letter of Credit',
-                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} sale received +$${adj.toLocaleString()} credit.`,
-                        '💰'
-                    );
-                } else if (adj < 0) {
-                    // Revenue went DOWN - Letter of Debit
-                    NotificationManager.add(
-                        'qp-debit',
-                        'QP Settlement: Letter of Debit',
-                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} sale owes -$${Math.abs(adj).toLocaleString()} adjustment.`,
-                        '📉'
-                    );
-                }
-            });
-
-            // Update UI
             PositionsWidget.render();
         } else {
             console.log('[QP] No trades pending QP reveal for month index:', currentMonthIndex);
@@ -2182,73 +2157,21 @@ const AnalyticsWidget = {
 
     /**
      * Render the analytics widget
+     * Currently disabled - was showing future prices which gave unfair advantage
      */
     render() {
-        const canvas = document.getElementById('futuresChart');
-        if (!canvas) return;
+        const container = document.getElementById('content4');
+        if (!container) return;
 
-        // Collect historical prices
-        const labels = [];
-        const lmeData = [];
-        const comexData = [];
-
-        console.log('[ANALYTICS] allMonthData:', GAME_STATE.allMonthData);
-        GAME_STATE.allMonthData.forEach((data, index) => {
-            console.log(`[ANALYTICS] Month ${index}:`, data);
-            if (data && data.PRICING) {
-                labels.push(data.MONTH.substring(0, 3));
-                lmeData.push(data.PRICING.LME.SPOT_AVG);
-                comexData.push(data.PRICING.COMEX.SPOT_AVG);
-            }
-        });
-
-        // Destroy existing chart
-        if (this.chart) {
-            this.chart.destroy();
-        }
-
-        // Create new chart
-        this.chart = new Chart(canvas, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'LME Spot',
-                        data: lmeData,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'transparent',
-                        tension: 0.3
-                    },
-                    {
-                        label: 'COMEX Spot',
-                        data: comexData,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'transparent',
-                        tension: 0.3
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: { color: '#888' }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: '#666' },
-                        grid: { color: '#333' }
-                    },
-                    y: {
-                        ticks: { color: '#666' },
-                        grid: { color: '#333' }
-                    }
-                }
-            }
-        });
+        // Show placeholder instead of chart
+        container.innerHTML = `
+            <div class="analytics-placeholder">
+                <div class="placeholder-icon">📊</div>
+                <div class="placeholder-title">Analytics</div>
+                <div class="placeholder-message">Price analytics coming soon.</div>
+                <div class="placeholder-hint">Historical price charts will be available in a future update.</div>
+            </div>
+        `;
     }
 };
 
