@@ -281,8 +281,10 @@ const GAME_STATE = {
 
         console.log('[GAME] Now on Turn', TimeManager.currentTurn, '-', result.details.monthName, result.details.periodName);
 
-        // Update debug panel
+        // Update debug panels
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
     },
 
     /**
@@ -398,6 +400,7 @@ const GAME_STATE = {
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
         return true;
     },
@@ -453,6 +456,7 @@ const GAME_STATE = {
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
         return profit;
     },
@@ -512,6 +516,7 @@ const GAME_STATE = {
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
         return true;
     },
@@ -550,6 +555,7 @@ const GAME_STATE = {
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
         return pl;
     },
@@ -1671,6 +1677,7 @@ const BankWidget = {
         GAME_STATE.updateHeader();
         this.render();
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
         alert(`Successfully drew $${amount.toLocaleString()} from Line of Credit!`);
     },
@@ -1740,6 +1747,7 @@ const BankWidget = {
         GAME_STATE.updateHeader();
         this.render();
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
         alert(`Successfully repaid $${amount.toLocaleString()} to Line of Credit!`);
     },
@@ -1976,8 +1984,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize map
     MapWidget.init();
 
-    // Update debug panel after initial render
+    // Update debug panels after initial render
     DebugPanel.update();
+    if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
 
     // Set up event listeners
     document.getElementById('nextTurnBtn').addEventListener('click', () => {

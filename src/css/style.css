@@ -795,3 +795,150 @@ body {
 #executeBankRepayBtn:hover {
     background: #f5d455;
 }
+
+/* ============================================================
+   ENHANCED DEBUG PANEL STYLES
+   ============================================================ */
+
+.debug-panel {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    width: 420px;
+    max-height: 80vh;
+    background: rgba(0, 0, 0, 0.95);
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    border: 1px solid #0f0;
+    border-radius: 4px;
+    z-index: 9999;
+    display: none;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+}
+
+.debug-panel.collapsed {
+    width: 150px;
+    max-height: 40px;
+}
+
+.debug-panel.collapsed .debug-panel-content {
+    display: none;
+}
+
+.debug-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, #001a00, #003300);
+    border-bottom: 1px solid #0f0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.debug-panel-header span {
+    font-weight: bold;
+    color: #0ff;
+    font-size: 12px;
+}
+
+.debug-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.debug-controls button {
+    background: transparent;
+    border: 1px solid #0f0;
+    color: #0f0;
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.debug-controls button:hover {
+    background: #0f0;
+    color: #000;
+}
+
+.debug-panel-content {
+    padding: 10px;
+    max-height: calc(80vh - 50px);
+    overflow-y: auto;
+}
+
+.debug-panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.debug-panel-content::-webkit-scrollbar-track {
+    background: #111;
+}
+
+.debug-panel-content::-webkit-scrollbar-thumb {
+    background: #0f0;
+    border-radius: 3px;
+}
+
+.debug-panel .debug-section {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #333;
+}
+
+.debug-panel .debug-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.debug-panel h3 {
+    color: #0ff;
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    padding: 4px 8px;
+    background: rgba(0, 255, 255, 0.1);
+    border-left: 3px solid #0ff;
+}
+
+.debug-panel pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.5;
+    color: #0f0;
+}
+
+.debug-panel .status-good {
+    color: #4caf50;
+}
+
+.debug-panel .status-bad {
+    color: #f44336;
+}
+
+.debug-panel .status-warn {
+    color: #f4c430;
+}
+
+.debug-panel .status-info {
+    color: #2196f3;
+}
+
+.debug-panel .status-header {
+    color: #0ff;
+    font-weight: bold;
+    display: block;
+    margin-top: 8px;
+}
+
+.debug-panel .position-item {
+    margin: 8px 0;
+    padding: 6px;
+    background: rgba(0, 255, 0, 0.05);
+    border-left: 2px solid #0f0;
+}
