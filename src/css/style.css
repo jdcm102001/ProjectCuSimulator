@@ -48,6 +48,23 @@ body {
     font-weight: bold;
 }
 
+#header .metric .value.qp-pending {
+    color: #ff9800;
+    animation: pulse-qp 2s infinite;
+}
+
+@keyframes pulse-qp {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+#header .qp-metric {
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid #ff9800;
+    padding: 5px 10px;
+    border-radius: 3px;
+}
+
 #nextTurnBtn {
     margin-left: auto;
     padding: 8px 20px;
@@ -262,6 +279,151 @@ body {
     text-align: center;
     padding: 40px;
     color: #666;
+}
+
+/* ============ POSITION CARDS ============ */
+.position-card {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    margin-bottom: 12px;
+    padding: 12px;
+}
+
+.position-card.in-transit {
+    border-left: 3px solid #2196F3;
+}
+
+.position-card.arrived {
+    border-left: 3px solid #4CAF50;
+}
+
+.position-card.pending-qp {
+    border-left: 3px solid #ff9800;
+}
+
+.position-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.position-id {
+    font-size: 11px;
+    color: #888;
+    font-family: monospace;
+}
+
+.status-badge.pending {
+    color: #ff9800;
+    border-color: #ff9800;
+}
+
+/* Transit Progress */
+.transit-info {
+    margin-bottom: 12px;
+    padding: 8px;
+    background: #252525;
+    border: 1px solid #333;
+}
+
+.transit-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.transit-progress .progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #333;
+    border: 1px solid #444;
+}
+
+.transit-progress .progress-fill {
+    height: 100%;
+    background: #2196F3;
+}
+
+.transit-progress .progress-text {
+    font-size: 11px;
+    color: #2196F3;
+    min-width: 35px;
+}
+
+.transit-eta {
+    font-size: 11px;
+    color: #ccc;
+}
+
+.transit-eta strong {
+    color: #2196F3;
+}
+
+.days-remaining {
+    color: #888;
+    margin-left: 10px;
+}
+
+/* Arrived Info */
+.arrived-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid #4CAF50;
+}
+
+.location-icon {
+    font-size: 16px;
+}
+
+.current-location {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+/* Position Details */
+.position-details {
+    font-size: 12px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dotted #333;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-row .label {
+    color: #888;
+}
+
+.detail-row .highlight {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+/* Position Actions */
+.position-actions {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #333;
+    display: flex;
+    gap: 8px;
+}
+
+.position-actions .trade-btn {
+    flex: 1;
 }
 
 /* Futures Widget */
@@ -541,6 +703,87 @@ body {
 #executeSellBtn {
     color: #f44336;
     border-color: #f44336;
+}
+
+/* ============ SELL PANEL ENHANCEMENTS ============ */
+.sell-location-section,
+.sell-buyer-section {
+    background: #1f1f1f;
+    border: 1px solid #333;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.location-header {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #333;
+}
+
+.sell-location-section .highlight {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+/* Region Match Indicator */
+.region-match-section {
+    margin: 10px 0;
+}
+
+.region-match-indicator {
+    padding: 10px;
+    text-align: center;
+    font-size: 12px;
+    border: 1px solid #333;
+}
+
+.region-match-indicator.match {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: #4CAF50;
+    color: #4CAF50;
+}
+
+.region-match-indicator.mismatch {
+    background: rgba(255, 152, 0, 0.15);
+    border-color: #ff9800;
+    color: #ff9800;
+}
+
+/* QP Warning */
+.qp-warning {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid #ff9800;
+    padding: 10px;
+    margin: 15px 0;
+}
+
+.qp-warning-icon {
+    width: 24px;
+    height: 24px;
+    background: #ff9800;
+    color: #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.qp-warning-text {
+    font-size: 11px;
+    color: #ccc;
+    line-height: 1.4;
+}
+
+.qp-warning-text strong {
+    color: #ff9800;
 }
 
 #executeBuyBtn:hover,

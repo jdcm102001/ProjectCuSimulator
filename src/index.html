@@ -50,6 +50,10 @@
             <span class="label">LOC Used</span>
             <span class="value" id="headerLOC">$0 / $200K</span>
         </div>
+        <div class="metric qp-metric" id="headerQPMetric" style="display: none;">
+            <span class="label">Pending QP</span>
+            <span class="value qp-pending" id="headerQPPending">0 sales</span>
+        </div>
         <button id="nextTurnBtn">NEXT TURN</button>
         <button id="debugBtn" onclick="DebugPanel.toggle()" style="background:#333;color:#4caf50;">DEBUG</button>
     </header>
@@ -199,18 +203,41 @@
             <button class="close-btn" onclick="TradePanel.close()">&times;</button>
         </div>
         <div class="trade-panel-body">
-            <div class="info-row">
-                <span class="label">Buyer:</span>
-                <span class="value" id="sellBuyer">-</span>
+            <!-- Cargo Location Section -->
+            <div class="sell-location-section" id="sellLocationSection">
+                <div class="location-header">CARGO LOCATION</div>
+                <div class="info-row">
+                    <span class="label">Current Port:</span>
+                    <span class="value highlight" id="sellCargoPort">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Region:</span>
+                    <span class="value" id="sellCargoRegion">-</span>
+                </div>
             </div>
-            <div class="info-row">
-                <span class="label">Destination:</span>
-                <span class="value" id="sellDest">-</span>
+
+            <!-- Buyer Section -->
+            <div class="sell-buyer-section">
+                <div class="location-header">BUYER</div>
+                <div class="info-row">
+                    <span class="label">Buyer:</span>
+                    <span class="value" id="sellBuyer">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Destination:</span>
+                    <span class="value" id="sellDest">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Premium:</span>
+                    <span class="value" id="sellPremiumInfo">-</span>
+                </div>
             </div>
-            <div class="info-row">
-                <span class="label">Premium:</span>
-                <span class="value" id="sellPremiumInfo">-</span>
+
+            <!-- Region Match Indicator -->
+            <div class="region-match-section" id="regionMatchSection">
+                <div id="regionMatchIndicator" class="region-match-indicator">-</div>
             </div>
+
             <div class="form-group">
                 <label>Select Inventory</label>
                 <select id="sellInventory">
@@ -223,11 +250,11 @@
             </div>
             <div class="calc-section">
                 <div class="calc-row">
-                    <span>Sale Price:</span>
+                    <span>Sale Price (Est.):</span>
                     <span id="sellPrice">$0</span>
                 </div>
                 <div class="calc-row">
-                    <span>Total Revenue:</span>
+                    <span>Est. Revenue:</span>
                     <span id="sellRevenue">$0</span>
                 </div>
                 <div class="calc-row">
@@ -235,10 +262,21 @@
                     <span id="sellCost">$0</span>
                 </div>
                 <div class="calc-row total">
-                    <span>Profit:</span>
+                    <span>Est. Profit:</span>
                     <span id="sellProfit">$0</span>
                 </div>
             </div>
+
+            <!-- QP Warning -->
+            <div class="qp-warning" id="qpWarning">
+                <div class="qp-warning-icon">!</div>
+                <div class="qp-warning-text">
+                    <strong>M+1 Pricing</strong><br>
+                    Final price will be revealed at <span id="qpRevealDate">-</span>.<br>
+                    Profit is estimated and subject to adjustment.
+                </div>
+            </div>
+
             <button id="executeSellBtn" onclick="TradePanel.executeSell()">SELL COPPER</button>
         </div>
     </div>
@@ -360,7 +398,7 @@
     </div>
 
     <!-- Main Application Script (cache-bust) -->
-    <script src="js/app.js?v=7"></script>
+    <script src="js/app.js?v=8"></script>
 
     <!-- Enhanced Debug Panel (Development Only) -->
     <script src="js/debug/debug-panel.js?v=2"></script>

@@ -300,6 +300,19 @@ const GAME_STATE = {
         // LOC
         document.getElementById('headerLOC').textContent =
             `${this.formatCurrency(this.locUsed)} / $200K`;
+
+        // QP Pending indicator
+        const pendingQP = this.salesPendingQP || [];
+        const qpMetric = document.getElementById('headerQPMetric');
+        const qpPending = document.getElementById('headerQPPending');
+        if (qpMetric && qpPending) {
+            if (pendingQP.length > 0) {
+                qpMetric.style.display = 'flex';
+                qpPending.textContent = `${pendingQP.length} sale${pendingQP.length > 1 ? 's' : ''}`;
+            } else {
+                qpMetric.style.display = 'none';
+            }
+        }
     },
 
     /**
@@ -530,8 +543,15 @@ const GAME_STATE = {
                 // Check if arrived (using TimeManager turn)
                 if (TimeManager.currentTurn >= pos.arrivalTurn) {
                     pos.status = 'ARRIVED';
+                    // Update current location to destination
+                    pos.currentLocation = 'AT_PORT';
+                    pos.currentPort = pos.destinationPort;
+                    pos.currentPortKey = pos.destination;
+                    pos.currentPortName = pos.destinationPortName;
+                    pos.currentRegion = pos.destinationRegion;
+                    pos.arrivedTurn = TimeManager.currentTurn;
                     this.inventory += pos.tonnage;
-                    console.log('[GAME] Position arrived:', pos.id);
+                    console.log('[GAME] Position arrived at', pos.currentPort, ':', pos.id);
                 }
             }
         });
@@ -541,6 +561,22 @@ const GAME_STATE = {
     supplierToPort: {
         'PERUVIAN': 'CALLAO',
         'CHILEAN': 'ANTOFAGASTA'
+    },
+
+    // Map destination keys to regions (for cargo location matching)
+    destinationToRegion: {
+        'SHANGHAI': 'ASIA',
+        'BUSAN': 'ASIA',
+        'NINGBO': 'ASIA',
+        'SINGAPORE': 'ASIA',
+        'ROTTERDAM': 'EUROPE',
+        'ANTWERP': 'EUROPE',
+        'HAMBURG': 'EUROPE',
+        'VALENCIA': 'EUROPE',
+        'NEW_ORLEANS': 'AMERICAS',
+        'HOUSTON': 'AMERICAS',
+        'NEWARK': 'AMERICAS',
+        'MONTREAL': 'AMERICAS'
     },
 
     /**
@@ -593,14 +629,21 @@ const GAME_STATE = {
         const arrivalTurn = TimeManager.calculateArrivalTurn(travelDays);
         const timeInfo = TimeManager.getMonthPeriod();
 
-        // Create position
+        // Determine destination region for future sale matching
+        const destinationRegion = this.destinationToRegion[destination] || 'UNKNOWN';
+
+        // Create position with enhanced location tracking
         const position = {
             id: 'PHYS_' + Date.now(),
             type: 'BUY',
             supplier: supplier,
             originPort: supplierData.ORIGIN_PORT,
+            originPortKey: portKey,
             destination: destination,
             destinationPort: destData.PORT_NAME + ', ' + destData.COUNTRY,
+            destinationPortName: destData.PORT_NAME,
+            destinationCountry: destData.COUNTRY,
+            destinationRegion: destinationRegion,
             tonnage: tonnage,
             exchange: exchange,
             shippingTerms: shippingTerms,
@@ -612,6 +655,11 @@ const GAME_STATE = {
             arrivalTurn: arrivalTurn,
             travelTimeDays: travelDays,
             distanceNM: destData.DISTANCE_NM,
+            // Current location tracking
+            currentLocation: 'IN_TRANSIT',
+            currentPort: null,
+            currentPortKey: null,
+            currentRegion: null,
             status: 'IN_TRANSIT'
         };
 
@@ -1046,6 +1094,38 @@ const MarketsWidget = {
 
 const PositionsWidget = {
     /**
+     * Calculate transit progress for a position
+     */
+    getTransitInfo(pos) {
+        const currentTurn = TimeManager.currentTurn;
+        const turnsElapsed = currentTurn - pos.purchaseTurn;
+        const totalTurns = pos.arrivalTurn - pos.purchaseTurn;
+        const turnsRemaining = Math.max(0, pos.arrivalTurn - currentTurn);
+
+        // Each turn ≈ 15 days
+        const daysElapsed = turnsElapsed * 15;
+        const daysRemaining = turnsRemaining * 15;
+
+        const progressPercent = totalTurns > 0 ? Math.min(100, (turnsElapsed / totalTurns) * 100) : 100;
+
+        // Get ETA month/period
+        const etaInfo = TimeManager.getMonthPeriod(pos.arrivalTurn);
+
+        return {
+            turnsElapsed,
+            totalTurns,
+            turnsRemaining,
+            daysElapsed,
+            daysRemaining,
+            totalDays: pos.travelTimeDays,
+            progressPercent,
+            etaTurn: pos.arrivalTurn,
+            etaMonth: etaInfo.monthName,
+            etaPeriod: etaInfo.periodName
+        };
+    },
+
+    /**
      * Render the positions widget
      */
     render() {
@@ -1067,26 +1147,48 @@ const PositionsWidget = {
         if (physPositions.length === 0) {
             html += '<div class="empty-state">No physical positions</div>';
         } else {
-            html += '<table class="positions-table">';
-            html += '<tr><th>Route</th><th>Tonnage</th><th>Cost</th><th>Status</th><th></th></tr>';
-
             physPositions.forEach(pos => {
-                const statusClass = pos.status === 'IN_TRANSIT' ? 'transit' : 'arrived';
-                html += `
-                    <tr>
-                        <td>${pos.supplier} → ${pos.destination}</td>
-                        <td>${pos.tonnage} MT</td>
-                        <td>$${pos.totalCost.toLocaleString()}</td>
-                        <td><span class="status-badge ${statusClass}">${pos.status}</span></td>
-                        <td>${pos.status === 'ARRIVED' ?
-                            `<button class="trade-btn sell" onclick="TradePanel.openSellFromPosition('${pos.id}')">SELL</button>` :
-                            ''}</td>
-                    </tr>
-                `;
+                html += this.renderPositionCard(pos);
             });
-            html += '</table>';
         }
         html += '</div>';
+
+        // Sales Pending QP
+        const pendingQP = GAME_STATE.salesPendingQP || [];
+        if (pendingQP.length > 0) {
+            html += '<div class="markets-section">';
+            html += '<h4>SALES PENDING QP REVEAL</h4>';
+            pendingQP.forEach(sale => {
+                const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
+                html += `
+                    <div class="position-card pending-qp">
+                        <div class="position-header">
+                            <span class="position-id">${sale.id}</span>
+                            <span class="status-badge pending">PENDING QP</span>
+                        </div>
+                        <div class="position-details">
+                            <div class="detail-row">
+                                <span class="label">Sold:</span>
+                                <span>${sale.tonnage} MT to ${sale.buyer}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">QP Reveals:</span>
+                                <span class="highlight">${qpMonth} Early</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Est. Revenue:</span>
+                                <span>$${sale.estimatedRevenue.toLocaleString()}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Est. Profit:</span>
+                                <span class="${sale.estimatedProfit >= 0 ? 'positive' : 'negative'}">$${sale.estimatedProfit.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        }
 
         // Futures positions
         html += '<div class="markets-section">';
@@ -1118,6 +1220,106 @@ const PositionsWidget = {
         html += '</div>';
 
         container.innerHTML = html;
+    },
+
+    /**
+     * Render a single position card with full details
+     */
+    renderPositionCard(pos) {
+        const isInTransit = pos.status === 'IN_TRANSIT';
+        const isArrived = pos.status === 'ARRIVED';
+
+        let statusHtml = '';
+        let locationHtml = '';
+        let actionHtml = '';
+
+        if (isInTransit) {
+            const transit = this.getTransitInfo(pos);
+            statusHtml = `
+                <div class="transit-info">
+                    <div class="transit-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${transit.progressPercent}%"></div>
+                        </div>
+                        <span class="progress-text">${Math.round(transit.progressPercent)}%</span>
+                    </div>
+                    <div class="transit-eta">
+                        ETA: <strong>${transit.etaMonth} ${transit.etaPeriod}</strong> (Turn ${transit.etaTurn})
+                        <span class="days-remaining">~${Math.round(transit.daysRemaining)} days</span>
+                    </div>
+                </div>
+            `;
+            locationHtml = `
+                <div class="detail-row">
+                    <span class="label">Route:</span>
+                    <span>${pos.originPort} → ${pos.destinationPortName || pos.destination}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Destination Region:</span>
+                    <span>${pos.destinationRegion}</span>
+                </div>
+            `;
+        } else if (isArrived) {
+            statusHtml = `
+                <div class="arrived-info">
+                    <span class="location-icon">📍</span>
+                    <span class="current-location">At ${pos.currentPort || pos.destinationPort}</span>
+                </div>
+            `;
+            locationHtml = `
+                <div class="detail-row">
+                    <span class="label">Current Location:</span>
+                    <span class="highlight">${pos.currentPortName || pos.destinationPortName || pos.destination}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Region:</span>
+                    <span>${pos.currentRegion || pos.destinationRegion}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">Arrived:</span>
+                    <span>Turn ${pos.arrivedTurn || pos.arrivalTurn}</span>
+                </div>
+            `;
+            actionHtml = `
+                <div class="position-actions">
+                    <button class="trade-btn sell" onclick="TradePanel.openSellFromPosition('${pos.id}')">SELL</button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="position-card ${isInTransit ? 'in-transit' : 'arrived'}">
+                <div class="position-header">
+                    <span class="position-id">${pos.id}</span>
+                    <span class="status-badge ${isInTransit ? 'transit' : 'arrived'}">${pos.status.replace('_', ' ')}</span>
+                </div>
+                ${statusHtml}
+                <div class="position-details">
+                    <div class="detail-row">
+                        <span class="label">Quantity:</span>
+                        <span><strong>${pos.tonnage} MT</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Supplier:</span>
+                        <span>${pos.supplier} (${pos.originPort})</span>
+                    </div>
+                    ${locationHtml}
+                    <div class="detail-row">
+                        <span class="label">Cost Basis:</span>
+                        <span>$${pos.pricePerMT.toLocaleString()}/MT ($${pos.totalCost.toLocaleString()} total)</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Terms:</span>
+                        <span>${pos.shippingTerms} | ${pos.exchange}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Purchased:</span>
+                        <span>${pos.purchaseMonth} ${pos.purchasePeriod} (Turn ${pos.purchaseTurn})</span>
+                    </div>
+                </div>
+                ${actionHtml}
+            </div>
+        `;
     }
 };
 
@@ -1691,21 +1893,85 @@ const TradePanel = {
         this.currentPosition = GAME_STATE.physicalPositions.find(p => p.id === positionId);
         if (!this.currentPosition) return;
 
-        // Find a buyer (use first available)
+        // Use the current period's buyer offer (simplified market)
         const data = GAME_STATE.currentMonthData;
-        this.currentBuyer = 0; // Use first buyer (index 0)
+        const offers = GAME_STATE.currentPeriodOffers;
+        this.currentBuyer = offers.buyer;
 
-        const buyer = data.CLIENTS.OPPORTUNITIES[0];
+        const buyer = offers.buyerData || data.CLIENTS.OPPORTUNITIES[0];
         const premium = buyer.REGIONAL_PREMIUM_USD || 0;
         document.getElementById('sellBuyer').textContent = buyer.REGION;
         document.getElementById('sellDest').textContent = buyer.PORT_OF_DISCHARGE;
         document.getElementById('sellPremiumInfo').textContent =
             (premium >= 0 ? '+' : '') + '$' + premium + '/MT';
 
+        // Update cargo location display
+        this.updateCargoLocationDisplay(this.currentPosition);
+
+        // Update region match indicator
+        this.updateRegionMatchIndicator(this.currentPosition, buyer);
+
+        // Update QP warning
+        this.updateQPWarning();
+
         // Populate inventory with this position selected
         this.populateInventory(positionId);
 
         document.getElementById('sellPanel').style.display = 'block';
+    },
+
+    /**
+     * Update cargo location display
+     */
+    updateCargoLocationDisplay(position) {
+        if (!position) return;
+
+        const cargoPort = position.currentPortName || position.destinationPortName || position.destination;
+        const cargoRegion = position.currentRegion || position.destinationRegion || 'UNKNOWN';
+
+        document.getElementById('sellCargoPort').textContent = cargoPort;
+        document.getElementById('sellCargoRegion').textContent = cargoRegion;
+    },
+
+    /**
+     * Update region match indicator
+     */
+    updateRegionMatchIndicator(position, buyer) {
+        const indicator = document.getElementById('regionMatchIndicator');
+        if (!position || !buyer) return;
+
+        const cargoRegion = position.currentRegion || position.destinationRegion;
+        const buyerRegion = buyer.REGION || '';
+
+        // Map buyer region to our region system
+        const buyerRegionMapped = GAME_STATE.regionToSalesLimit[buyerRegion.toUpperCase()] || 'UNKNOWN';
+
+        const isMatch = cargoRegion === buyerRegionMapped;
+
+        if (isMatch) {
+            indicator.className = 'region-match-indicator match';
+            indicator.innerHTML = `SAME REGION - No additional freight required`;
+        } else {
+            indicator.className = 'region-match-indicator mismatch';
+            indicator.innerHTML = `DIFFERENT REGION - Cargo at ${cargoRegion}, Buyer in ${buyerRegionMapped}<br><small>FOB from ${position.currentPortName || position.destination} - Buyer arranges freight</small>`;
+        }
+    },
+
+    /**
+     * Update QP warning display
+     */
+    updateQPWarning() {
+        const timeInfo = TimeManager.getMonthPeriod();
+        const qpMonthIndex = timeInfo.monthIndex + 1;
+
+        // Check if June (no M+1)
+        if (timeInfo.monthIndex >= 5) {
+            document.getElementById('qpWarning').style.display = 'none';
+        } else {
+            document.getElementById('qpWarning').style.display = 'flex';
+            const qpMonth = TimeManager.MONTHS[qpMonthIndex];
+            document.getElementById('qpRevealDate').textContent = `${qpMonth} Early`;
+        }
     },
 
     /**
@@ -1724,7 +1990,8 @@ const TradePanel = {
 
         arrivedPositions.forEach(pos => {
             const selected = pos.id === selectedId ? 'selected' : '';
-            select.innerHTML += `<option value="${pos.id}" ${selected}>${pos.tonnage} MT from ${pos.supplier}</option>`;
+            const location = pos.currentPortName || pos.destinationPortName || pos.destination;
+            select.innerHTML += `<option value="${pos.id}" ${selected}>${pos.tonnage} MT at ${location}</option>`;
         });
 
         this.updateSellCalc();
@@ -1741,6 +2008,12 @@ const TradePanel = {
         const positionId = document.getElementById('sellInventory').value;
         const position = GAME_STATE.physicalPositions.find(p => p.id === positionId);
         const tonnage = parseInt(document.getElementById('sellTonnage').value) || 0;
+
+        // Update cargo location display when inventory changes
+        if (position) {
+            this.updateCargoLocationDisplay(position);
+            this.updateRegionMatchIndicator(position, buyer);
+        }
 
         // Sale price
         let basePrice = data.PRICING.LME.SPOT_AVG; // Default
@@ -1763,7 +2036,7 @@ const TradePanel = {
         }
         document.getElementById('sellCost').textContent = '$' + cost.toLocaleString();
 
-        // Profit
+        // Profit (estimated)
         const profit = revenue - cost;
         const profitEl = document.getElementById('sellProfit');
         profitEl.textContent = '$' + profit.toLocaleString();
@@ -1782,11 +2055,21 @@ const TradePanel = {
             return;
         }
 
+        const timeInfo = TimeManager.getMonthPeriod();
+        const isJune = timeInfo.monthIndex >= 5;
+
         const profit = GAME_STATE.sellCopper(positionId, this.currentBuyer, tonnage);
 
         if (profit !== false) {
             this.close();
-            alert(`Sale complete! Profit: $${profit.toLocaleString()}`);
+
+            // Show appropriate message based on M+1 status
+            if (isJune) {
+                alert(`Sale complete!\nFinal Profit: $${profit.toLocaleString()}\n\n(June sales settle at current price)`);
+            } else {
+                const qpMonth = TimeManager.MONTHS[timeInfo.monthIndex + 1];
+                alert(`Sale recorded!\n\nEstimated Profit: $${profit.toLocaleString()}\n\nFinal price will be revealed at ${qpMonth} Early.\nProfit is subject to M+1 adjustment.`);
+            }
         }
     },
 
