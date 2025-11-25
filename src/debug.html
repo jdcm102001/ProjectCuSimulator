@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Debug - Trading Simulator</title>
+    <style>
+        body { background: #1a1a1a; color: #e0e0e0; font-family: monospace; padding: 20px; }
+        pre { white-space: pre-wrap; }
+        button { margin: 5px; padding: 10px 20px; font-family: monospace; cursor: pointer; }
+        #controls { margin: 20px 0; }
+        .section { border: 1px solid #444; padding: 10px; margin: 10px 0; }
+    </style>
+
+    <!-- Load data files -->
+    <script src="data/january.js"></script>
+    <script src="data/february.js"></script>
+    <script src="data/march.js"></script>
+    <script src="data/april.js"></script>
+    <script src="data/may.js"></script>
+    <script src="data/june.js"></script>
+</head>
+<body>
+    <h1>DEBUG MODE - Text Only</h1>
+
+    <div class="section">
+        <h3>DATA LOAD CHECK</h3>
+        <pre id="dataCheck"></pre>
+    </div>
+
+    <div id="controls">
+        <button onclick="buy('PERUVIAN', 10, 'SHANGHAI')">BUY 10 MT (Peruvian→Shanghai)</button>
+        <button onclick="buy('CHILEAN', 20, 'ROTTERDAM')">BUY 20 MT (Chilean→Rotterdam)</button>
+        <button onclick="sell()">SELL (first arrived)</button>
+        <button onclick="advance()">ADVANCE TURN</button>
+        <button onclick="refresh()">REFRESH DISPLAY</button>
+    </div>
+
+    <div class="section">
+        <h3>GAME STATE</h3>
+        <pre id="state"></pre>
+    </div>
+
+    <div class="section">
+        <h3>ACTION LOG</h3>
+        <pre id="log"></pre>
+    </div>
+
+<script>
+// ============================================================
+// MINIMAL GAME STATE - Just the essentials
+// ============================================================
+
+const GAME = {
+    turn: 1,
+    month: 0, // 0=Jan, 1=Feb, etc.
+    cash: 200000,
+    locLimit: 200000,
+    locUsed: 0,
+    positions: [],
+    history: [],
+
+    // All month data
+    monthData: []
+};
+
+// Port mapping for freight lookup
+const PORT_MAP = {
+    'PERUVIAN': 'CALLAO',
+    'CHILEAN': 'ANTOFAGASTA'
+};
+
+// Log helper
+function log(msg) {
+    GAME.history.push(`Turn ${GAME.turn}: ${msg}`);
+    refresh();
+}
+
+// ============================================================
+// CORE FUNCTIONS
+// ============================================================
+
+function buy(supplier, tonnage, destination) {
+    const data = GAME.monthData[GAME.month];
+    if (!data) {
+        log('ERROR: No month data loaded');
+        return;
+    }
+
+    // Get supplier info
+    const supplyData = data.MARKET_DEPTH.SUPPLY[supplier];
+    if (!supplyData) {
+        log(`ERROR: Unknown supplier ${supplier}`);
+        return;
+    }
+
+    // Get freight info
+    const portKey = PORT_MAP[supplier];
+    const freightData = data.LOGISTICS.FREIGHT_RATES[portKey][destination];
+    if (!freightData) {
+        log(`ERROR: Unknown route ${portKey} → ${destination}`);
+        return;
+    }
+
+    // Calculate price
+    const spotPrice = data.PRICING.LME.SPOT_AVG;
+    const premium = supplyData.SUPPLIER_PREMIUM_USD || 0;
+    const freight = freightData.CIF_RATE_USD_PER_TONNE;
+    const pricePerMT = spotPrice + premium + freight;
+    const totalCost = pricePerMT * tonnage;
+
+    // Check funds
+    const available = GAME.cash + (GAME.locLimit - GAME.locUsed);
+    if (totalCost > available) {
+        log(`ERROR: Insufficient funds. Need $${totalCost}, have $${available}`);
+        return;
+    }
+
+    // Deduct funds
+    if (totalCost <= GAME.cash) {
+        GAME.cash -= totalCost;
+    } else {
+        const fromLOC = totalCost - GAME.cash;
+        GAME.cash = 0;
+        GAME.locUsed += fromLOC;
+    }
+
+    // Calculate arrival (turns based on travel days)
+    const travelDays = freightData.TRAVEL_TIME_DAYS;
+    const turnsToArrive = Math.ceil(travelDays / 2.5); // ~2.5 days per turn
+    const arrivalTurn = GAME.turn + turnsToArrive;
+
+    // Create position
+    const position = {
+        id: GAME.positions.length + 1,
+        supplier: supplier,
+        origin: portKey,
+        destination: destination,
+        tonnage: tonnage,
+        pricePerMT: pricePerMT,
+        totalCost: totalCost,
+        purchaseTurn: GAME.turn,
+        arrivalTurn: arrivalTurn,
+        status: 'IN_TRANSIT'
+    };
+
+    GAME.positions.push(position);
+    log(`Bought ${tonnage} MT from ${supplier} @ $${pricePerMT}/MT = $${totalCost}. Arrives turn ${arrivalTurn}`);
+}
+
+function sell() {
+    // Find first arrived position
+    const pos = GAME.positions.find(p => p.status === 'ARRIVED');
+    if (!pos) {
+        log('ERROR: No arrived positions to sell');
+        return;
+    }
+
+    const data = GAME.monthData[GAME.month];
+    const spotPrice = data.PRICING.LME.SPOT_AVG;
+    const clientPremium = 120; // Asia premium
+    const salePrice = spotPrice + clientPremium;
+    const revenue = salePrice * pos.tonnage;
+    const profit = revenue - pos.totalCost;
+
+    // Add revenue
+    GAME.cash += revenue;
+
+    // Mark as sold
+    pos.status = 'SOLD';
+    pos.salePrice = salePrice;
+    pos.revenue = revenue;
+    pos.profit = profit;
+
+    log(`Sold ${pos.tonnage} MT @ $${salePrice}/MT = $${revenue}. Profit: $${profit}`);
+}
+
+function advance() {
+    GAME.turn++;
+
+    // Check month change (every 12 turns)
+    if (GAME.turn > 12) {
+        GAME.turn = 1;
+        GAME.month++;
+        if (GAME.month > 5) {
+            log('GAME OVER - Completed 6 months');
+            return;
+        }
+        log(`New month: ${getMonthName(GAME.month)}`);
+    }
+
+    // Update position statuses
+    GAME.positions.forEach(pos => {
+        if (pos.status === 'IN_TRANSIT' && GAME.turn >= pos.arrivalTurn) {
+            pos.status = 'ARRIVED';
+            log(`Position #${pos.id} ARRIVED at ${pos.destination}`);
+        }
+    });
+
+    log(`Advanced to turn ${GAME.turn}`);
+}
+
+function getMonthName(index) {
+    return ['January', 'February', 'March', 'April', 'May', 'June'][index] || 'Unknown';
+}
+
+// ============================================================
+// DISPLAY FUNCTIONS
+// ============================================================
+
+function refresh() {
+    const data = GAME.monthData[GAME.month];
+
+    // State display
+    let state = `=== GAME STATE ===
+Turn: ${GAME.turn} (${getMonthName(GAME.month)})
+Cash: $${GAME.cash.toLocaleString()}
+LOC Used: $${GAME.locUsed.toLocaleString()} / $${GAME.locLimit.toLocaleString()}
+Available Funds: $${(GAME.cash + GAME.locLimit - GAME.locUsed).toLocaleString()}
+
+=== PRICES (${getMonthName(GAME.month)}) ===`;
+
+    if (data && data.PRICING) {
+        state += `
+LME Spot:  $${data.PRICING.LME.SPOT_AVG}
+LME 1M:    $${data.PRICING.LME.FUTURES_1M}
+LME 3M:    $${data.PRICING.LME.FUTURES_3M}
+COMEX Spot: $${data.PRICING.COMEX.SPOT_AVG}`;
+    } else {
+        state += '\n[NO PRICING DATA]';
+    }
+
+    state += `
+
+=== POSITIONS (${GAME.positions.length}) ===`;
+
+    if (GAME.positions.length === 0) {
+        state += '\n[No positions]';
+    } else {
+        GAME.positions.forEach(pos => {
+            state += `
+#${pos.id}: ${pos.tonnage} MT | ${pos.origin}→${pos.destination} | ${pos.status}`;
+            if (pos.status === 'IN_TRANSIT') {
+                state += ` | Arrives: Turn ${pos.arrivalTurn}`;
+            }
+            if (pos.status === 'SOLD') {
+                state += ` | Profit: $${pos.profit}`;
+            }
+        });
+    }
+
+    document.getElementById('state').textContent = state;
+
+    // Log display
+    document.getElementById('log').textContent = GAME.history.join('\n');
+}
+
+function checkDataLoad() {
+    let result = '=== DATA LOAD CHECK ===\n\n';
+
+    const months = [
+        { name: 'JANUARY', data: window.JANUARY_DATA },
+        { name: 'FEBRUARY', data: window.FEBRUARY_DATA },
+        { name: 'MARCH', data: window.MARCH_DATA },
+        { name: 'APRIL', data: window.APRIL_DATA },
+        { name: 'MAY', data: window.MAY_DATA },
+        { name: 'JUNE', data: window.JUNE_DATA }
+    ];
+
+    months.forEach(m => {
+        if (m.data) {
+            result += `✅ ${m.name}: Loaded\n`;
+            result += `   MONTH: ${m.data.MONTH}\n`;
+            result += `   MARKET_DEPTH: ${m.data.MARKET_DEPTH ? 'YES' : 'NO'}\n`;
+            result += `   MARKET_DEPTH.SUPPLY: ${m.data.MARKET_DEPTH?.SUPPLY ? 'YES' : 'NO'}\n`;
+            result += `   PRICING: ${m.data.PRICING ? 'YES' : 'NO'}\n`;
+            result += `   PRICING.LME.SPOT_AVG: ${m.data.PRICING?.LME?.SPOT_AVG || 'MISSING'}\n`;
+            result += `   CLIENTS: ${m.data.CLIENTS ? 'YES' : 'NO'}\n`;
+            result += `   LOGISTICS: ${m.data.LOGISTICS ? 'YES' : 'NO'}\n\n`;
+
+            // Add to game data array
+            GAME.monthData.push(m.data);
+        } else {
+            result += `❌ ${m.name}: NOT LOADED\n\n`;
+            GAME.monthData.push(null);
+        }
+    });
+
+    document.getElementById('dataCheck').textContent = result;
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
+window.onload = function() {
+    console.log('Debug page loading...');
+    checkDataLoad();
+    refresh();
+    log('Game initialized');
+};
+</script>
+</body>
+</html>
