@@ -170,6 +170,14 @@ const GAME_STATE = {
         EUROPE: { used: 0, max: 55 }
     },
 
+    // Current period offers (simplified market - one supplier, one buyer per period)
+    currentPeriodOffers: {
+        supplier: null,      // Key like 'PERUVIAN' or 'CHILEAN'
+        supplierData: null,  // Full supplier data object
+        buyer: null,         // Index into CLIENTS.OPPORTUNITIES
+        buyerData: null      // Full buyer data object
+    },
+
     // Month data array
     allMonthData: [],
     currentMonthData: null,
@@ -202,6 +210,9 @@ const GAME_STATE = {
         console.log('[GAME] currentMonthData:', this.currentMonthData);
         console.log('[GAME] Current month:', this.currentMonthData ? this.currentMonthData.MONTH : 'undefined');
 
+        // Generate initial period offers (simplified market)
+        this.generatePeriodOffers();
+
         // Update header display
         this.updateHeader();
     },
@@ -212,6 +223,50 @@ const GAME_STATE = {
     updateCurrentMonthData() {
         const timeInfo = TimeManager.getMonthPeriod();
         this.currentMonthData = this.allMonthData[timeInfo.monthIndex];
+    },
+
+    /**
+     * Generate period offers - selects ONE supplier and ONE buyer for the current period
+     * Uses turn number as seed for deterministic selection
+     */
+    generatePeriodOffers() {
+        const data = this.currentMonthData;
+        if (!data) {
+            console.warn('[MARKET] No current month data for period offers');
+            return;
+        }
+
+        const turn = TimeManager.currentTurn;
+
+        // Get available suppliers (excluding TOTAL_MARKET_DEPTH_MT)
+        const suppliers = Object.keys(data.MARKET_DEPTH.SUPPLY)
+            .filter(k => k !== 'TOTAL_MARKET_DEPTH_MT');
+
+        // Get available buyers
+        const buyers = data.CLIENTS.OPPORTUNITIES;
+
+        if (suppliers.length === 0 || buyers.length === 0) {
+            console.warn('[MARKET] No suppliers or buyers available');
+            return;
+        }
+
+        // Deterministic selection based on turn (alternates between options)
+        const supplierIndex = (turn - 1) % suppliers.length;
+        const buyerIndex = (turn - 1) % buyers.length;
+
+        const selectedSupplier = suppliers[supplierIndex];
+        const selectedBuyer = buyerIndex;
+
+        this.currentPeriodOffers = {
+            supplier: selectedSupplier,
+            supplierData: data.MARKET_DEPTH.SUPPLY[selectedSupplier],
+            buyer: selectedBuyer,
+            buyerData: buyers[selectedBuyer]
+        };
+
+        console.log(`[MARKET] Period offers generated for Turn ${turn}:`);
+        console.log(`  Supplier: ${selectedSupplier}`);
+        console.log(`  Buyer: ${buyers[selectedBuyer].REGION} (index ${selectedBuyer})`);
     },
 
     /**
@@ -284,6 +339,9 @@ const GAME_STATE = {
 
         // Mark futures positions for settlement
         this.settleFutures();
+
+        // Generate new period offers (simplified market)
+        this.generatePeriodOffers();
 
         // Update header
         this.updateHeader();
@@ -728,14 +786,20 @@ const MarketsWidget = {
 
         let html = '';
 
-        // Suppliers section
-        html += '<div class="markets-section">';
-        html += '<h4>SUPPLIERS (Buy From)</h4>';
-        html += '<table class="market-table">';
-        html += '<tr><th>Name</th><th>Port</th><th>Premium</th><th>Range</th><th></th></tr>';
+        // Get simplified period offers
+        const offers = GAME_STATE.currentPeriodOffers;
+        const portKey = this.supplierToPort[offers.supplier];
+        const purchaseLimit = GAME_STATE.checkPurchaseLimit(portKey, 0);
 
-        for (const [key, supplier] of Object.entries(data.MARKET_DEPTH.SUPPLY)) {
-            if (key === 'TOTAL_MARKET_DEPTH_MT') continue; // Skip totals
+        // Suppliers section - SIMPLIFIED (one supplier per period)
+        html += '<div class="markets-section">';
+        html += '<h4>THIS PERIOD\'S SUPPLIER</h4>';
+        html += '<table class="market-table">';
+        html += '<tr><th>Name</th><th>Port</th><th>Premium</th><th>Available</th><th></th></tr>';
+
+        if (offers.supplier && offers.supplierData) {
+            const key = offers.supplier;
+            const supplier = offers.supplierData;
             const premium = supplier.SUPPLIER_PREMIUM_USD || 0;
             const premiumSign = premium >= 0 ? '+' : '';
             // Determine tonnage range based on supplier type
@@ -747,37 +811,51 @@ const MarketsWidget = {
                 minMT = supplier.MIN_AVAILABLE_MT || 0;
                 maxMT = supplier.MAX_AVAILABLE_MT || 0;
             }
+            // Show remaining limit
+            const remainingLimit = purchaseLimit.remaining;
+            const limitClass = remainingLimit <= 0 ? 'negative' : '';
             html += `
                 <tr>
-                    <td>${key}</td>
+                    <td><strong>${key}</strong></td>
                     <td>${supplier.ORIGIN_PORT}</td>
                     <td>${premiumSign}$${premium}/MT</td>
-                    <td>${minMT}-${maxMT} MT</td>
-                    <td><button class="trade-btn" onclick="TradePanel.openBuy('${key}')">BUY</button></td>
+                    <td class="${limitClass}">${remainingLimit}/${purchaseLimit.max} MT left</td>
+                    <td><button class="trade-btn" onclick="TradePanel.openBuy('${key}')" ${remainingLimit <= 0 ? 'disabled' : ''}>BUY</button></td>
                 </tr>
             `;
+        } else {
+            html += '<tr><td colspan="5">No supplier available this period</td></tr>';
         }
         html += '</table></div>';
 
-        // Buyers section
+        // Buyers section - SIMPLIFIED (one buyer per period)
         html += '<div class="markets-section">';
-        html += '<h4>BUYERS (Sell To)</h4>';
+        html += '<h4>THIS PERIOD\'S BUYER</h4>';
         html += '<table class="market-table">';
-        html += '<tr><th>Region</th><th>Destination</th><th>Premium</th><th>Range</th><th></th></tr>';
+        html += '<tr><th>Region</th><th>Destination</th><th>Premium</th><th>Available</th><th></th></tr>';
 
-        data.CLIENTS.OPPORTUNITIES.forEach((buyer, index) => {
+        if (offers.buyer !== null && offers.buyerData) {
+            const buyer = offers.buyerData;
+            const index = offers.buyer;
             const premium = buyer.REGIONAL_PREMIUM_USD || 0;
             const premiumSign = premium >= 0 ? '+' : '';
+            // Get sales limit for this region
+            const buyerRegion = buyer.REGION || 'AMERICAS';
+            const salesLimitRegion = GAME_STATE.regionToSalesLimit[buyerRegion.toUpperCase()] || 'AMERICAS';
+            const salesLimit = GAME_STATE.checkSalesLimit(salesLimitRegion, 0);
+            const limitClass = salesLimit.remaining <= 0 ? 'negative' : '';
             html += `
                 <tr>
-                    <td>${buyer.REGION}</td>
+                    <td><strong>${buyer.REGION}</strong></td>
                     <td>${buyer.PORT_OF_DISCHARGE}</td>
                     <td>${premiumSign}$${premium}/MT</td>
-                    <td>${buyer.MIN_QUANTITY_MT}-${buyer.MAX_QUANTITY_MT} MT</td>
-                    <td><button class="trade-btn sell" onclick="TradePanel.openSell(${index})">SELL</button></td>
+                    <td class="${limitClass}">${salesLimit.remaining}/${salesLimit.max} MT left</td>
+                    <td><button class="trade-btn sell" onclick="TradePanel.openSell(${index})" ${salesLimit.remaining <= 0 ? 'disabled' : ''}>SELL</button></td>
                 </tr>
             `;
-        });
+        } else {
+            html += '<tr><td colspan="5">No buyer available this period</td></tr>';
+        }
         html += '</table></div>';
 
         // Exchange prices
