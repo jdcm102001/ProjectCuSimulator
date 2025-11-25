@@ -166,10 +166,13 @@ ${this.statusIcon(boundaryOK)} isMonthBoundary() → ${isBoundary} (period=${tim
                 const hasLocationFields = 'currentLocation' in pos && 'currentRegion' in pos;
 
                 // Calculate QP info
+                // Trade in month X → M+1 = X+1 (averaging month) → Reveals at X+2 Early
                 const purchaseMonthIndex = TimeManager.MONTHS.indexOf(pos.purchaseMonth);
-                const qpMonthIndex = purchaseMonthIndex + 1; // M+1
+                const qpMonthIndex = purchaseMonthIndex + 1; // M+1 (the averaging month)
                 const qpMonthName = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
-                const qpRevealTurn = (qpMonthIndex + 1) * 2 + 1; // Early period of M+2
+                const revealMonthIndex = qpMonthIndex + 1; // M+2 (when reveal happens)
+                const revealMonthName = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
+                const qpRevealTurn = (qpMonthIndex + 1) * 2 + 1; // Early period of reveal month
 
                 positionHtml += `
 ┌─────────────────────────────────────
@@ -198,7 +201,7 @@ ${this.statusIcon(boundaryOK)} isMonthBoundary() → ${isBoundary} (period=${tim
 │
 │ <span class="status-header">QP INFO (for purchases):</span>
 │ - QP Basis: M+1 (${qpMonthName} average)
-│ - M+1 Reveal Due: Turn ${qpRevealTurn} (${qpMonthName} Early)
+│ - Reveal Due: Turn ${qpRevealTurn} (${revealMonthName} Early)
 └─────────────────────────────────────
 `;
             });
@@ -358,10 +361,11 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
         } else {
             pendingPurchases.forEach(purchase => {
                 const qpMonth = TimeManager.MONTHS[purchase.qpMonthIndex] || 'N/A';
+                const revealMonth = TimeManager.MONTHS[purchase.qpMonthIndex + 1] || 'N/A';
                 pendingPurchasesHtml += `
 ┌ ${purchase.id}: ${purchase.tonnage} MT from ${purchase.supplier}
 │ Purchased: ${purchase.purchaseMonth} ${purchase.purchasePeriod} (Turn ${purchase.purchaseTurn})
-│ QP Reveal: ${qpMonth} Early
+│ QP Basis: ${qpMonth} avg → Reveals: ${revealMonth} Early
 │ Prov Base: $${purchase.provisionalBasePrice?.toLocaleString()}/MT
 │ Premium: $${purchase.premium?.toLocaleString()}/MT (FIXED)
 │ Freight: $${purchase.freight?.toLocaleString()}/MT (FIXED)
@@ -379,10 +383,11 @@ ${this.statusIcon(salesLimits !== null)} Sales Implemented: ${salesLimits ? 'Yes
         } else {
             pendingSales.forEach(sale => {
                 const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
+                const revealMonth = TimeManager.MONTHS[sale.qpMonthIndex + 1] || 'N/A';
                 pendingSalesHtml += `
 ┌ ${sale.id}: ${sale.tonnage} MT to ${sale.buyer}
 │ Sold: ${sale.saleMonth} ${sale.salePeriod} (Turn ${sale.saleTurn})
-│ QP Reveal: ${qpMonth} Early
+│ QP Basis: ${qpMonth} avg → Reveals: ${revealMonth} Early
 │ Est Price: $${sale.estimatedSalePrice}/MT
 │ Est Revenue: $${sale.estimatedRevenue?.toLocaleString()}
 │ Est Profit: <span class="${sale.estimatedProfit >= 0 ? 'status-good' : 'status-bad'}">$${sale.estimatedProfit?.toLocaleString()}</span>
@@ -492,14 +497,18 @@ Net M+1 Impact: <span class="${totalNetImpact >= 0 ? 'status-good' : 'status-bad
     /**
      * Get QP reveal status for each trigger turn
      * Now tracks both purchases and sales repricing
+     *
+     * TIMING: Trade in month X → M+1 = X+1 (averaging month) → Reveals at X+2 Early
+     * - January trade → Feb avg → Reveals March Early (Turn 5)
+     * - February trade → Mar avg → Reveals April Early (Turn 7)
+     * - etc.
      */
     getQPRevealStatus(currentTurn, completedSales, completedPurchases = []) {
         const reveals = [
-            { turn: 3, month: 'Feb', reveals: 'January M+1', tradeMonth: 'January' },
-            { turn: 5, month: 'Mar', reveals: 'February M+1', tradeMonth: 'February' },
-            { turn: 7, month: 'Apr', reveals: 'March M+1', tradeMonth: 'March' },
-            { turn: 9, month: 'May', reveals: 'April M+1', tradeMonth: 'April' },
-            { turn: 11, month: 'Jun', reveals: 'May M+1', tradeMonth: 'May' }
+            { turn: 5, month: 'Mar', qpMonth: 'Feb avg', tradeMonth: 'January' },
+            { turn: 7, month: 'Apr', qpMonth: 'Mar avg', tradeMonth: 'February' },
+            { turn: 9, month: 'May', qpMonth: 'Apr avg', tradeMonth: 'March' },
+            { turn: 11, month: 'Jun', qpMonth: 'May avg', tradeMonth: 'April' }
         ];
 
         let html = '';
@@ -523,7 +532,7 @@ Net M+1 Impact: <span class="${totalNetImpact >= 0 ? 'status-good' : 'status-bad
             }
             html += `
 ┌ Turn ${r.turn} (${r.month} Early):
-│ - Reveals: ${r.reveals}
+│ - Uses: ${r.qpMonth} (M+1 for ${r.tradeMonth})
 │ - Reprices: ${r.tradeMonth} trades (P+S)
 │ - Status: ${status}
 └─────────────────────────────────────
@@ -534,11 +543,12 @@ Net M+1 Impact: <span class="${totalNetImpact >= 0 ? 'status-good' : 'status-bad
 
     /**
      * Get next reveal turn
+     * Reveals happen at March Early (5), April Early (7), May Early (9), June Early (11)
      */
     getNextRevealTurn() {
         if (typeof TimeManager === 'undefined') return 'Unknown';
         const turn = TimeManager.currentTurn;
-        const revealTurns = [3, 5, 7, 9, 11];
+        const revealTurns = [5, 7, 9, 11]; // Mar, Apr, May, Jun Early
         for (const rt of revealTurns) {
             if (turn < rt) return `Turn ${rt}`;
         }

@@ -662,18 +662,36 @@ const GAME_STATE = {
     /**
      * Process QP (Quotational Period) reveals for M+1 repricing
      * Called at Early periods when entering a new month
-     * Reveals actual prices for BOTH purchases AND sales made in the previous month
-     * Premium and freight remain FIXED - only base price adjusts
+     *
+     * TIMING LOGIC:
+     * - Trade in Month X → M+1 = Month X+1 (the QP period)
+     * - QP = average of all trading days in Month X+1
+     * - This average is only known at the END of Month X+1
+     * - So reveal happens at the START of Month X+2
+     *
+     * Example: January trade → M+1=February → reveals at March Early
+     *
      * @param {number} currentMonthIndex - The current month index (0-5)
      */
     processQPReveals(currentMonthIndex) {
-        // Get the M+1 price data (current month = M+1 for trades made last month)
-        const m1Data = this.allMonthData[currentMonthIndex];
-        if (!m1Data || !m1Data.PRICING) {
-            console.warn('[QP] No pricing data for M+1 month:', currentMonthIndex);
+        // We're entering a new month - check for QP reveals from the PREVIOUS month
+        // If we're in March (index 2), we reveal February (index 1) QP averages
+        // These February averages finalize trades made in January (index 0)
+        const qpMonthToReveal = currentMonthIndex - 1;
+
+        if (qpMonthToReveal < 0) {
+            console.log('[QP] No QP to reveal yet (still in first month)');
             return;
         }
 
+        // Get the QP month's pricing data (the month whose average is now known)
+        const qpMonthData = this.allMonthData[qpMonthToReveal];
+        if (!qpMonthData || !qpMonthData.PRICING) {
+            console.warn('[QP] No pricing data for QP month:', qpMonthToReveal);
+            return;
+        }
+
+        const qpMonthName = TimeManager.MONTHS[qpMonthToReveal];
         const monthName = TimeManager.getMonthPeriod().monthName;
         let totalPurchaseAdjustment = 0;
         let totalSaleAdjustment = 0;
@@ -681,17 +699,18 @@ const GAME_STATE = {
         let salesProcessed = 0;
 
         // ========== PROCESS PURCHASES ==========
+        // Find purchases where qpMonthIndex matches the month we're now revealing
         const purchasesToProcess = this.purchasesPendingQP.filter(
-            p => p.qpMonthIndex === currentMonthIndex && !p.qpRevealed
+            p => p.qpMonthIndex === qpMonthToReveal && !p.qpRevealed
         );
 
         if (purchasesToProcess.length > 0) {
             console.log(`[QP] Processing ${purchasesToProcess.length} purchases for M+1 repricing...`);
 
             purchasesToProcess.forEach(purchase => {
-                // Get actual M+1 base price
+                // Get actual M+1 base price (the QP month's average)
                 const actualBasePrice = purchase.exchange === 'LME' ?
-                    m1Data.PRICING.LME.SPOT_AVG : m1Data.PRICING.COMEX.SPOT_AVG;
+                    qpMonthData.PRICING.LME.SPOT_AVG : qpMonthData.PRICING.COMEX.SPOT_AVG;
 
                 // Calculate actual cost (base + fixed premium + fixed freight)
                 const actualPricePerMT = actualBasePrice + purchase.premium + purchase.freight;
@@ -742,14 +761,14 @@ const GAME_STATE = {
                     NotificationManager.add(
                         'qp-debit',
                         'QP Settlement: Letter of Debit',
-                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${purchase.purchaseMonth} purchase cost increased by $${costAdjustment.toLocaleString()}.`,
+                        `${qpMonthName} avg revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${purchase.purchaseMonth} purchase cost increased by $${costAdjustment.toLocaleString()}.`,
                         '📉'
                     );
                 } else if (costAdjustment < 0) {
                     NotificationManager.add(
                         'qp-credit',
                         'QP Settlement: Letter of Credit',
-                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${purchase.purchaseMonth} purchase cost decreased - $${Math.abs(costAdjustment).toLocaleString()} refunded.`,
+                        `${qpMonthName} avg revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${purchase.purchaseMonth} purchase cost decreased - $${Math.abs(costAdjustment).toLocaleString()} refunded.`,
                         '💰'
                     );
                 }
@@ -764,22 +783,23 @@ const GAME_STATE = {
 
             // Remove processed purchases from pending
             this.purchasesPendingQP = this.purchasesPendingQP.filter(
-                p => p.qpMonthIndex !== currentMonthIndex || !p.qpRevealed
+                p => p.qpMonthIndex !== qpMonthToReveal || !p.qpRevealed
             );
         }
 
         // ========== PROCESS SALES ==========
+        // Find sales where qpMonthIndex matches the month we're now revealing
         const salesToProcess = this.salesPendingQP.filter(
-            sale => sale.qpMonthIndex === currentMonthIndex && !sale.qpRevealed
+            sale => sale.qpMonthIndex === qpMonthToReveal && !sale.qpRevealed
         );
 
         if (salesToProcess.length > 0) {
             console.log(`[QP] Processing ${salesToProcess.length} sales for M+1 repricing...`);
 
             salesToProcess.forEach(sale => {
-                // Get actual M+1 price
+                // Get actual M+1 price (the QP month's average)
                 const actualBasePrice = sale.exchange === 'LME' ?
-                    m1Data.PRICING.LME.SPOT_AVG : m1Data.PRICING.COMEX.SPOT_AVG;
+                    qpMonthData.PRICING.LME.SPOT_AVG : qpMonthData.PRICING.COMEX.SPOT_AVG;
 
                 const actualSalePrice = actualBasePrice + sale.premium;
                 const actualRevenue = actualSalePrice * sale.tonnage;
@@ -813,14 +833,14 @@ const GAME_STATE = {
                     NotificationManager.add(
                         'qp-credit',
                         'QP Settlement: Letter of Credit',
-                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale received +$${adjustment.toLocaleString()} credit.`,
+                        `${qpMonthName} avg revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale received +$${adjustment.toLocaleString()} credit.`,
                         '💰'
                     );
                 } else if (adjustment < 0) {
                     NotificationManager.add(
                         'qp-debit',
                         'QP Settlement: Letter of Debit',
-                        `${monthName} M+1 revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale revenue decreased by $${Math.abs(adjustment).toLocaleString()}.`,
+                        `${qpMonthName} avg revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale revenue decreased by $${Math.abs(adjustment).toLocaleString()}.`,
                         '📉'
                     );
                 }
@@ -831,7 +851,7 @@ const GAME_STATE = {
 
             // Remove processed sales from pending
             this.salesPendingQP = this.salesPendingQP.filter(
-                sale => sale.qpMonthIndex !== currentMonthIndex || !sale.qpRevealed
+                sale => sale.qpMonthIndex !== qpMonthToReveal || !sale.qpRevealed
             );
         }
 
@@ -1564,6 +1584,7 @@ const PositionsWidget = {
             html += '<h4>PURCHASES PENDING QP REVEAL</h4>';
             pendingPurchases.forEach(purchase => {
                 const qpMonth = TimeManager.MONTHS[purchase.qpMonthIndex] || 'N/A';
+                const revealMonth = TimeManager.MONTHS[purchase.qpMonthIndex + 1] || 'N/A';
                 html += `
                     <div class="position-card pending-qp purchase">
                         <div class="position-header">
@@ -1577,7 +1598,7 @@ const PositionsWidget = {
                             </div>
                             <div class="detail-row">
                                 <span class="label">QP Reveals:</span>
-                                <span class="highlight">${qpMonth} Early</span>
+                                <span class="highlight">${revealMonth} Early (${qpMonth} avg)</span>
                             </div>
                             <div class="detail-row">
                                 <span class="label">Prov. Base:</span>
@@ -1605,6 +1626,7 @@ const PositionsWidget = {
             html += '<h4>SALES PENDING QP REVEAL</h4>';
             pendingQP.forEach(sale => {
                 const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
+                const revealMonth = TimeManager.MONTHS[sale.qpMonthIndex + 1] || 'N/A';
                 html += `
                     <div class="position-card pending-qp sale">
                         <div class="position-header">
@@ -1618,7 +1640,7 @@ const PositionsWidget = {
                             </div>
                             <div class="detail-row">
                                 <span class="label">QP Reveals:</span>
-                                <span class="highlight">${qpMonth} Early</span>
+                                <span class="highlight">${revealMonth} Early (${qpMonth} avg)</span>
                             </div>
                             <div class="detail-row">
                                 <span class="label">Est. Revenue:</span>
@@ -1799,7 +1821,11 @@ const PositionsWidget = {
             `;
         } else {
             // QP not yet revealed - show provisional with pending notice
+            // qpMonthIndex = M+1 (the month whose average we need, e.g., February for January trade)
+            // revealMonthIndex = M+2 (when the reveal happens, e.g., March for January trade)
             const qpMonthIndex = pos.qpMonthIndex || (TimeManager.MONTHS.indexOf(pos.purchaseMonth) + 1);
+            const revealMonthIndex = qpMonthIndex + 1;
+            const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
             const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
             return `
                 <div class="detail-row">
@@ -1808,7 +1834,7 @@ const PositionsWidget = {
                 </div>
                 <div class="detail-row qp-pending-row">
                     <span class="label">Final Price:</span>
-                    <span class="qp-pending-badge">⏳ PENDING - Reveals ${qpMonth} Early</span>
+                    <span class="qp-pending-badge">⏳ PENDING - ${qpMonth} avg reveals ${revealMonth} Early</span>
                 </div>
             `;
         }
@@ -2399,18 +2425,22 @@ const TradePanel = {
 
     /**
      * Update QP warning display
+     * Shows when the M+1 QP will be revealed
+     * Trade in month X → M+1 = X+1 → Reveals at X+2 Early
      */
     updateQPWarning() {
         const timeInfo = TimeManager.getMonthPeriod();
-        const qpMonthIndex = timeInfo.monthIndex + 1;
+        const qpMonthIndex = timeInfo.monthIndex + 1; // M+1 (the averaging month)
+        const revealMonthIndex = qpMonthIndex + 1;    // M+2 (when the reveal happens)
 
-        // Check if June (no M+1)
-        if (timeInfo.monthIndex >= 5) {
+        // Check if May or June (no room for M+2 reveal)
+        if (timeInfo.monthIndex >= 4) {
             document.getElementById('qpWarning').style.display = 'none';
         } else {
             document.getElementById('qpWarning').style.display = 'flex';
             const qpMonth = TimeManager.MONTHS[qpMonthIndex];
-            document.getElementById('qpRevealDate').textContent = `${qpMonth} Early`;
+            const revealMonth = TimeManager.MONTHS[revealMonthIndex];
+            document.getElementById('qpRevealDate').textContent = `${revealMonth} Early (${qpMonth} avg)`;
         }
     },
 
