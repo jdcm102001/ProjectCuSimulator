@@ -157,6 +157,19 @@ const GAME_STATE = {
     inventory: 0,
     totalInterestPaid: 0,
 
+    // Monthly Purchase Limits (MT) - reset at month boundaries
+    monthlyPurchaseLimits: {
+        CALLAO: { used: 0, max: 20 },        // Peruvian supplier
+        ANTOFAGASTA: { used: 0, max: 90 }    // Chilean supplier
+    },
+
+    // Monthly Sales Limits (MT) - reset at month boundaries
+    monthlySalesLimits: {
+        AMERICAS: { used: 0, max: 90 },
+        ASIA: { used: 0, max: 85 },
+        EUROPE: { used: 0, max: 55 }
+    },
+
     // Month data array
     allMonthData: [],
     currentMonthData: null,
@@ -264,6 +277,9 @@ const GAME_STATE = {
 
             // Charge LOC interest at month boundaries
             this.chargeLOCInterest();
+
+            // Reset monthly purchase/sales limits
+            this.resetMonthlyLimits();
         }
 
         // Mark futures positions for settlement
@@ -284,7 +300,6 @@ const GAME_STATE = {
         // Update debug panels
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
         if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
     },
 
     /**
@@ -303,6 +318,59 @@ const GAME_STATE = {
         if (this.locUsed > this.lineOfCredit) {
             alert(`Warning: LOC exceeded! Used: $${this.locUsed.toLocaleString()} / Limit: $${this.lineOfCredit.toLocaleString()}`);
         }
+    },
+
+    /**
+     * Reset monthly limits at month boundaries
+     */
+    resetMonthlyLimits() {
+        // Reset purchase limits
+        for (const port in this.monthlyPurchaseLimits) {
+            this.monthlyPurchaseLimits[port].used = 0;
+        }
+
+        // Reset sales limits
+        for (const region in this.monthlySalesLimits) {
+            this.monthlySalesLimits[region].used = 0;
+        }
+
+        console.log('[GAME] Monthly purchase/sales limits reset');
+    },
+
+    /**
+     * Check if purchase is within monthly limit
+     * @param {string} port - CALLAO or ANTOFAGASTA
+     * @param {number} tonnage - Amount to purchase
+     * @returns {object} {allowed, remaining, max}
+     */
+    checkPurchaseLimit(port, tonnage) {
+        const limit = this.monthlyPurchaseLimits[port];
+        if (!limit) return { allowed: true, remaining: 999, max: 999 };
+
+        const remaining = limit.max - limit.used;
+        return {
+            allowed: tonnage <= remaining,
+            remaining: remaining,
+            max: limit.max
+        };
+    },
+
+    /**
+     * Check if sale is within monthly limit
+     * @param {string} region - AMERICAS, ASIA, or EUROPE
+     * @param {number} tonnage - Amount to sell
+     * @returns {object} {allowed, remaining, max}
+     */
+    checkSalesLimit(region, tonnage) {
+        const limit = this.monthlySalesLimits[region];
+        if (!limit) return { allowed: true, remaining: 999, max: 999 };
+
+        const remaining = limit.max - limit.used;
+        return {
+            allowed: tonnage <= remaining,
+            remaining: remaining,
+            max: limit.max
+        };
     },
 
     /**
@@ -338,6 +406,13 @@ const GAME_STATE = {
         const portKey = this.supplierToPort[supplier];
         const destData = data.LOGISTICS.FREIGHT_RATES[portKey][destination];
 
+        // Check monthly purchase limit
+        const limitCheck = this.checkPurchaseLimit(portKey, tonnage);
+        if (!limitCheck.allowed) {
+            alert(`Monthly purchase limit exceeded for ${portKey}!\nRemaining: ${limitCheck.remaining} MT / ${limitCheck.max} MT`);
+            return false;
+        }
+
         // Calculate costs
         const basePrice = exchange === 'LME' ? data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
         const premium = supplierData.SUPPLIER_PREMIUM_USD || 0;
@@ -352,6 +427,9 @@ const GAME_STATE = {
             alert('Insufficient funds!');
             return false;
         }
+
+        // Update monthly purchase limit
+        this.monthlyPurchaseLimits[portKey].used += tonnage;
 
         // Deduct funds
         if (totalCost <= this.practiceFunds) {
@@ -405,6 +483,19 @@ const GAME_STATE = {
         return true;
     },
 
+    // Map buyer regions to sales limit regions
+    regionToSalesLimit: {
+        'NORTH AMERICA': 'AMERICAS',
+        'SOUTH AMERICA': 'AMERICAS',
+        'AMERICAS': 'AMERICAS',
+        'ASIA': 'ASIA',
+        'ASIA PACIFIC': 'ASIA',
+        'CHINA': 'ASIA',
+        'EUROPE': 'EUROPE',
+        'WESTERN EUROPE': 'EUROPE',
+        'EASTERN EUROPE': 'EUROPE'
+    },
+
     /**
      * Sell copper
      */
@@ -425,6 +516,17 @@ const GAME_STATE = {
         const data = this.currentMonthData;
         const buyerData = data.CLIENTS.OPPORTUNITIES[buyerIndex];
 
+        // Map buyer region to sales limit region
+        const buyerRegion = buyerData.REGION || 'AMERICAS';
+        const salesLimitRegion = this.regionToSalesLimit[buyerRegion.toUpperCase()] || 'AMERICAS';
+
+        // Check monthly sales limit
+        const limitCheck = this.checkSalesLimit(salesLimitRegion, tonnage);
+        if (!limitCheck.allowed) {
+            alert(`Monthly sales limit exceeded for ${salesLimitRegion}!\nRemaining: ${limitCheck.remaining} MT / ${limitCheck.max} MT`);
+            return false;
+        }
+
         // Calculate sale price
         const basePrice = position.exchange === 'LME' ?
             data.PRICING.LME.SPOT_AVG : data.PRICING.COMEX.SPOT_AVG;
@@ -435,6 +537,9 @@ const GAME_STATE = {
         // Calculate profit
         const costBasis = position.pricePerMT * tonnage;
         const profit = revenue - costBasis;
+
+        // Update monthly sales limit
+        this.monthlySalesLimits[salesLimitRegion].used += tonnage;
 
         // Update funds
         this.practiceFunds += revenue;
