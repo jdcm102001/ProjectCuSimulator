@@ -657,3 +657,141 @@ body {
     color: #ccc;
     line-height: 1.4;
 }
+
+/* ============================================================
+   BANK WIDGET STYLES
+   ============================================================ */
+
+#bankContent {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #333;
+}
+
+.bank-section h4 {
+    color: #4caf50;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.bank-stats {
+    margin-bottom: 12px;
+}
+
+.bank-stats .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 12px;
+}
+
+.bank-stats .stat-row .label {
+    color: #888;
+}
+
+.bank-stats .stat-row .value {
+    color: #e0e0e0;
+    font-weight: 500;
+}
+
+.bank-stats .stat-row .value.positive {
+    color: #4caf50;
+}
+
+.bank-stats .stat-row .value.negative {
+    color: #f44336;
+}
+
+.bank-progress {
+    margin-bottom: 12px;
+}
+
+.bank-progress .progress-bar {
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.bank-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50 0%, #f4c430 50%, #f44336 100%);
+    transition: width 0.3s ease;
+}
+
+.bank-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.bank-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.bank-btn.draw {
+    background: #1a5928;
+    color: #4caf50;
+    border: 1px solid #4caf50;
+}
+
+.bank-btn.draw:hover:not(:disabled) {
+    background: #2a7938;
+}
+
+.bank-btn.repay {
+    background: #3d2914;
+    color: #f4c430;
+    border: 1px solid #f4c430;
+}
+
+.bank-btn.repay:hover:not(:disabled) {
+    background: #5d4924;
+}
+
+.bank-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.bank-note {
+    font-size: 10px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Bank Panel Headers */
+.trade-panel-header.bank {
+    background: linear-gradient(135deg, #1a3d1a, #2a5a2a);
+}
+
+.trade-panel-header.bank.repay {
+    background: linear-gradient(135deg, #3d3d1a, #5a5a2a);
+}
+
+/* Execute buttons for bank panels */
+#executeBankDrawBtn {
+    background: #4caf50;
+    color: #fff;
+}
+
+#executeBankDrawBtn:hover {
+    background: #5cbf60;
+}
+
+#executeBankRepayBtn {
+    background: #f4c430;
+    color: #000;
+}
+
+#executeBankRepayBtn:hover {
+    background: #f5d455;
+}

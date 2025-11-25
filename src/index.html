@@ -66,6 +66,9 @@
                 <li data-widget="Map">Active Map</li>
                 <li data-widget="Analytics">Analytics</li>
             </ul>
+            <div id="bankContent">
+                <!-- Bank widget renders here -->
+            </div>
         </aside>
 
         <!-- WORKSPACE (2x2 Grid) -->
@@ -286,7 +289,77 @@
         </div>
     </div>
 
+    <!-- BANK DRAW PANEL -->
+    <div id="bankDrawPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header bank">
+            <span>Draw from Line of Credit</span>
+            <button class="close-btn" onclick="BankWidget.closePanel()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Available Credit:</span>
+                <span class="value positive" id="bankDrawMax">$0</span>
+            </div>
+            <div class="form-group">
+                <label>Amount to Draw ($)</label>
+                <input type="number" id="bankDrawAmount" min="1000" step="1000" value="50000" oninput="BankWidget.updateDrawCalc()">
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>New Practice Funds:</span>
+                    <span id="bankDrawNewFunds">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>New LOC Balance:</span>
+                    <span id="bankDrawNewLoc">$0</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Est. Monthly Interest:</span>
+                    <span id="bankDrawInterest">$0</span>
+                </div>
+            </div>
+            <button id="executeBankDrawBtn" onclick="BankWidget.executeDraw()">DRAW FUNDS</button>
+        </div>
+    </div>
+
+    <!-- BANK REPAY PANEL -->
+    <div id="bankRepayPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header bank repay">
+            <span>Repay Line of Credit</span>
+            <button class="close-btn" onclick="BankWidget.closePanel()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Outstanding Balance:</span>
+                <span class="value negative" id="bankRepayOutstanding">$0</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Max Repayment:</span>
+                <span class="value" id="bankRepayMax">$0</span>
+            </div>
+            <div class="form-group">
+                <label>Amount to Repay ($)</label>
+                <input type="number" id="bankRepayAmount" min="1000" step="1000" value="50000" oninput="BankWidget.updateRepayCalc()">
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>New Practice Funds:</span>
+                    <span id="bankRepayNewFunds">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>New LOC Balance:</span>
+                    <span id="bankRepayNewLoc">$0</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Monthly Interest Savings:</span>
+                    <span id="bankRepaySavings" class="positive">$0</span>
+                </div>
+            </div>
+            <button id="executeBankRepayBtn" onclick="BankWidget.executeRepay()">REPAY LOAN</button>
+        </div>
+    </div>
+
     <!-- Main Application Script (cache-bust) -->
-    <script src="js/app.js?v=3"></script>
+    <script src="js/app.js?v=4"></script>
 </body>
 </html>

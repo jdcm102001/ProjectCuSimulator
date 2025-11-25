@@ -7,19 +7,146 @@
  */
 
 // ============================================================
+// SECTION 0: TIME MANAGER
+// ============================================================
+
+/**
+ * TimeManager handles the bi-weekly period system
+ * 6 months × 2 periods = 12 turns total
+ *
+ * Turn 1  = January Early
+ * Turn 2  = January Late
+ * Turn 3  = February Early
+ * Turn 4  = February Late
+ * ... and so on
+ * Turn 12 = June Late
+ */
+const TimeManager = {
+    // Constants
+    MONTHS: ['January', 'February', 'March', 'April', 'May', 'June'],
+    PERIODS: ['Early', 'Late'],
+    TOTAL_TURNS: 12,
+    PERIODS_PER_MONTH: 2,
+
+    // Current state
+    currentTurn: 1,  // 1-12
+
+    /**
+     * Initialize TimeManager
+     */
+    init() {
+        this.currentTurn = 1;
+        console.log('[TIME] TimeManager initialized at Turn 1 (January Early)');
+    },
+
+    /**
+     * Get turn number from month index and period
+     * @param {number} monthIndex - 0-5 (January=0, June=5)
+     * @param {number} period - 1 or 2 (Early=1, Late=2)
+     * @returns {number} turn - 1-12
+     */
+    getTurnNumber(monthIndex, period) {
+        return (monthIndex * this.PERIODS_PER_MONTH) + period;
+    },
+
+    /**
+     * Get month index and period from turn number
+     * @param {number} turn - 1-12
+     * @returns {object} {monthIndex, period, monthName, periodName}
+     */
+    getMonthPeriod(turn = this.currentTurn) {
+        const monthIndex = Math.floor((turn - 1) / this.PERIODS_PER_MONTH);
+        const period = ((turn - 1) % this.PERIODS_PER_MONTH) + 1;
+        return {
+            monthIndex: monthIndex,
+            period: period,
+            monthName: this.MONTHS[monthIndex],
+            periodName: this.PERIODS[period - 1]
+        };
+    },
+
+    /**
+     * Advance to the next period
+     * @returns {object} {newTurn, isMonthChange, isGameOver, details}
+     */
+    advancePeriod() {
+        const oldDetails = this.getMonthPeriod();
+        const wasMonthEnd = oldDetails.period === 2; // Was Late period
+
+        this.currentTurn++;
+
+        // Check game over
+        if (this.currentTurn > this.TOTAL_TURNS) {
+            return {
+                newTurn: this.currentTurn,
+                isMonthChange: false,
+                isGameOver: true,
+                details: null
+            };
+        }
+
+        const newDetails = this.getMonthPeriod();
+
+        console.log(`[TIME] Advanced to Turn ${this.currentTurn}: ${newDetails.monthName} ${newDetails.periodName}`);
+
+        return {
+            newTurn: this.currentTurn,
+            isMonthChange: wasMonthEnd,
+            isGameOver: false,
+            details: newDetails
+        };
+    },
+
+    /**
+     * Check if current turn is at a month boundary (Late → Early transition will occur on next advance)
+     * @returns {boolean}
+     */
+    isMonthBoundary() {
+        const details = this.getMonthPeriod();
+        return details.period === 2; // Late period = end of month
+    },
+
+    /**
+     * Get display string for current time
+     * @returns {string} e.g., "JAN - Early (1/12)"
+     */
+    getDisplayString() {
+        const details = this.getMonthPeriod();
+        const monthShort = details.monthName.substring(0, 3).toUpperCase();
+        return `${monthShort} - ${details.periodName} (${this.currentTurn}/${this.TOTAL_TURNS})`;
+    },
+
+    /**
+     * Calculate arrival turn from current turn + travel days
+     * Each period ≈ 15 days (half month)
+     * @param {number} travelDays
+     * @returns {number} arrivalTurn
+     */
+    calculateArrivalTurn(travelDays) {
+        const periodsToTravel = Math.ceil(travelDays / 15);
+        return Math.min(this.currentTurn + periodsToTravel, this.TOTAL_TURNS);
+    },
+
+    /**
+     * Get remaining turns in game
+     * @returns {number}
+     */
+    getRemainingTurns() {
+        return this.TOTAL_TURNS - this.currentTurn;
+    }
+};
+
+
+// ============================================================
 // SECTION 1: GAME STATE
 // ============================================================
 
 const GAME_STATE = {
-    // Current period
-    currentTurn: 1,
-    currentMonth: 'January',
-    currentMonthData: null,
-
     // Finances
     practiceFunds: 200000,
     lineOfCredit: 200000,
     locUsed: 0,
+    locInterestRate: 0.0036, // 0.36% monthly
 
     // Positions
     physicalPositions: [],
@@ -28,15 +155,20 @@ const GAME_STATE = {
     // Tracking
     totalPL: 0,
     inventory: 0,
+    totalInterestPaid: 0,
 
     // Month data array
     allMonthData: [],
+    currentMonthData: null,
 
     /**
      * Initialize the game state
      */
     init() {
         console.log('[GAME] Initializing...');
+
+        // Initialize TimeManager
+        TimeManager.init();
 
         // Debug: Check what global data exists
         console.log('[GAME] window.JANUARY_DATA:', window.JANUARY_DATA);
@@ -52,8 +184,8 @@ const GAME_STATE = {
             window.JUNE_DATA
         ];
 
-        // Set current month data
-        this.currentMonthData = this.allMonthData[0];
+        // Set current month data based on TimeManager
+        this.updateCurrentMonthData();
         console.log('[GAME] currentMonthData:', this.currentMonthData);
         console.log('[GAME] Current month:', this.currentMonthData ? this.currentMonthData.MONTH : 'undefined');
 
@@ -62,14 +194,19 @@ const GAME_STATE = {
     },
 
     /**
+     * Update current month data based on TimeManager
+     */
+    updateCurrentMonthData() {
+        const timeInfo = TimeManager.getMonthPeriod();
+        this.currentMonthData = this.allMonthData[timeInfo.monthIndex];
+    },
+
+    /**
      * Update header displays
      */
     updateHeader() {
-        // Period
-        const turn = this.currentTurn;
-        const monthShort = this.currentMonth.substring(0, 3).toUpperCase();
-        const period = turn <= 4 ? 'Early' : turn <= 8 ? 'Mid' : 'Late';
-        document.getElementById('headerPeriod').textContent = `${monthShort} - ${period} (${turn}/12)`;
+        // Period - using TimeManager
+        document.getElementById('headerPeriod').textContent = TimeManager.getDisplayString();
 
         // Funds
         document.getElementById('headerFunds').textContent = this.formatCurrency(this.practiceFunds);
@@ -111,21 +248,22 @@ const GAME_STATE = {
         // Update position statuses
         this.updatePositionStatuses();
 
-        // Advance turn counter
-        this.currentTurn++;
+        // Use TimeManager to advance
+        const result = TimeManager.advancePeriod();
 
-        // Check if we need to advance month (every 12 turns = 1 month)
-        if (this.currentTurn > 12) {
-            this.currentTurn = 1;
-            const monthIndex = this.allMonthData.indexOf(this.currentMonthData);
-            if (monthIndex < this.allMonthData.length - 1) {
-                this.currentMonthData = this.allMonthData[monthIndex + 1];
-                this.currentMonth = this.currentMonthData.MONTH;
-                console.log('[GAME] New month:', this.currentMonth);
-            } else {
-                alert('Game Over! You have completed all 6 months.');
-                return;
-            }
+        // Check game over
+        if (result.isGameOver) {
+            alert('Game Over! You have completed all 6 months.');
+            return;
+        }
+
+        // Update current month data if month changed
+        if (result.isMonthChange) {
+            this.updateCurrentMonthData();
+            console.log('[GAME] New month:', result.details.monthName);
+
+            // Charge LOC interest at month boundaries
+            this.chargeLOCInterest();
         }
 
         // Mark futures positions for settlement
@@ -139,11 +277,30 @@ const GAME_STATE = {
         PositionsWidget.render();
         FuturesWidget.render();
         AnalyticsWidget.render();
+        if (typeof BankWidget !== 'undefined') BankWidget.render();
 
-        console.log('[GAME] Now on turn', this.currentTurn, 'of', this.currentMonth);
+        console.log('[GAME] Now on Turn', TimeManager.currentTurn, '-', result.details.monthName, result.details.periodName);
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+    },
+
+    /**
+     * Charge LOC interest at month boundaries
+     */
+    chargeLOCInterest() {
+        if (this.locUsed <= 0) return;
+
+        const interest = Math.round(this.locUsed * this.locInterestRate);
+        this.locUsed += interest;
+        this.totalInterestPaid += interest;
+
+        console.log(`[GAME] LOC Interest charged: $${interest.toLocaleString()}`);
+
+        // Check if LOC exceeded limit
+        if (this.locUsed > this.lineOfCredit) {
+            alert(`Warning: LOC exceeded! Used: $${this.locUsed.toLocaleString()} / Limit: $${this.lineOfCredit.toLocaleString()}`);
+        }
     },
 
     /**
@@ -152,8 +309,8 @@ const GAME_STATE = {
     updatePositionStatuses() {
         this.physicalPositions.forEach(pos => {
             if (pos.status === 'IN_TRANSIT') {
-                // Check if arrived
-                if (this.currentTurn >= pos.arrivalTurn) {
+                // Check if arrived (using TimeManager turn)
+                if (TimeManager.currentTurn >= pos.arrivalTurn) {
                     pos.status = 'ARRIVED';
                     this.inventory += pos.tonnage;
                     console.log('[GAME] Position arrived:', pos.id);
@@ -203,9 +360,10 @@ const GAME_STATE = {
             this.locUsed += fromLOC;
         }
 
-        // Calculate travel time
+        // Calculate travel time using TimeManager
         const travelDays = destData.TRAVEL_TIME_DAYS;
-        const turnsToArrive = Math.ceil(travelDays / 2.5); // ~2.5 days per turn
+        const arrivalTurn = TimeManager.calculateArrivalTurn(travelDays);
+        const timeInfo = TimeManager.getMonthPeriod();
 
         // Create position
         const position = {
@@ -220,9 +378,10 @@ const GAME_STATE = {
             shippingTerms: shippingTerms,
             pricePerMT: pricePerMT,
             totalCost: totalCost,
-            purchaseTurn: this.currentTurn,
-            purchaseMonth: this.currentMonth,
-            arrivalTurn: this.currentTurn + turnsToArrive,
+            purchaseTurn: TimeManager.currentTurn,
+            purchaseMonth: timeInfo.monthName,
+            purchasePeriod: timeInfo.periodName,
+            arrivalTurn: arrivalTurn,
             travelTimeDays: travelDays,
             distanceNM: destData.DISTANCE_NM,
             status: 'IN_TRANSIT'
@@ -323,6 +482,9 @@ const GAME_STATE = {
         // Deduct margin
         this.practiceFunds -= totalDeducted;
 
+        // Get current time info
+        const timeInfo = TimeManager.getMonthPeriod();
+
         // Create position
         const position = {
             id: 'FUT_' + Date.now(),
@@ -333,8 +495,9 @@ const GAME_STATE = {
             entryPrice: price,
             margin: totalMargin,
             fees: totalFees,
-            openTurn: this.currentTurn,
-            openMonth: this.currentMonth,
+            openTurn: TimeManager.currentTurn,
+            openMonth: timeInfo.monthName,
+            openPeriod: timeInfo.periodName,
             status: 'OPEN',
             unrealizedPL: 0
         };
@@ -1380,7 +1543,219 @@ const SidebarManager = {
 
 
 // ============================================================
-// SECTION 10: DEBUG PANEL
+// SECTION 10: BANK WIDGET (LOC Management)
+// ============================================================
+
+const BankWidget = {
+    /**
+     * Render the bank widget in sidebar or dedicated panel
+     */
+    render() {
+        const container = document.getElementById('bankContent');
+        if (!container) return;
+
+        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
+        const utilizationPercent = ((GAME_STATE.locUsed / GAME_STATE.lineOfCredit) * 100).toFixed(1);
+
+        let html = `
+            <div class="bank-section">
+                <h4>LINE OF CREDIT</h4>
+                <div class="bank-stats">
+                    <div class="stat-row">
+                        <span class="label">Credit Limit:</span>
+                        <span class="value">$${GAME_STATE.lineOfCredit.toLocaleString()}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="label">Used:</span>
+                        <span class="value ${GAME_STATE.locUsed > 0 ? 'negative' : ''}">$${GAME_STATE.locUsed.toLocaleString()}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="label">Available:</span>
+                        <span class="value positive">$${locAvailable.toLocaleString()}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="label">Utilization:</span>
+                        <span class="value">${utilizationPercent}%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="label">Interest Rate:</span>
+                        <span class="value">${(GAME_STATE.locInterestRate * 100).toFixed(2)}% / month</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="label">Total Interest Paid:</span>
+                        <span class="value negative">$${GAME_STATE.totalInterestPaid.toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <div class="bank-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${Math.min(utilizationPercent, 100)}%"></div>
+                    </div>
+                </div>
+
+                <div class="bank-actions">
+                    <button class="bank-btn draw" onclick="BankWidget.openDrawPanel()" ${locAvailable <= 0 ? 'disabled' : ''}>
+                        DRAW FUNDS
+                    </button>
+                    <button class="bank-btn repay" onclick="BankWidget.openRepayPanel()" ${GAME_STATE.locUsed <= 0 ? 'disabled' : ''}>
+                        REPAY LOAN
+                    </button>
+                </div>
+
+                <div class="bank-note">
+                    <small>Interest charged at end of each month on outstanding balance.</small>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+    },
+
+    /**
+     * Open draw funds panel
+     */
+    openDrawPanel() {
+        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
+        if (locAvailable <= 0) {
+            alert('No credit available to draw!');
+            return;
+        }
+
+        document.getElementById('bankDrawMax').textContent = '$' + locAvailable.toLocaleString();
+        document.getElementById('bankDrawAmount').max = locAvailable;
+        document.getElementById('bankDrawAmount').value = Math.min(50000, locAvailable);
+        this.updateDrawCalc();
+
+        document.getElementById('bankDrawPanel').style.display = 'block';
+    },
+
+    /**
+     * Update draw calculation
+     */
+    updateDrawCalc() {
+        const amount = parseInt(document.getElementById('bankDrawAmount').value) || 0;
+        const newFunds = GAME_STATE.practiceFunds + amount;
+        const newLocUsed = GAME_STATE.locUsed + amount;
+        const monthlyInterest = Math.round(newLocUsed * GAME_STATE.locInterestRate);
+
+        document.getElementById('bankDrawNewFunds').textContent = '$' + newFunds.toLocaleString();
+        document.getElementById('bankDrawNewLoc').textContent = '$' + newLocUsed.toLocaleString();
+        document.getElementById('bankDrawInterest').textContent = '$' + monthlyInterest.toLocaleString() + '/month';
+    },
+
+    /**
+     * Execute draw
+     */
+    executeDraw() {
+        const amount = parseInt(document.getElementById('bankDrawAmount').value) || 0;
+        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
+
+        if (amount <= 0) {
+            alert('Please enter a valid amount!');
+            return;
+        }
+
+        if (amount > locAvailable) {
+            alert('Amount exceeds available credit!');
+            return;
+        }
+
+        // Transfer from LOC to practice funds
+        GAME_STATE.locUsed += amount;
+        GAME_STATE.practiceFunds += amount;
+
+        console.log(`[BANK] Drew $${amount.toLocaleString()} from LOC`);
+
+        // Close panel and update displays
+        this.closePanel();
+        GAME_STATE.updateHeader();
+        this.render();
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+
+        alert(`Successfully drew $${amount.toLocaleString()} from Line of Credit!`);
+    },
+
+    /**
+     * Open repay panel
+     */
+    openRepayPanel() {
+        if (GAME_STATE.locUsed <= 0) {
+            alert('No outstanding balance to repay!');
+            return;
+        }
+
+        const maxRepay = Math.min(GAME_STATE.practiceFunds, GAME_STATE.locUsed);
+        document.getElementById('bankRepayOutstanding').textContent = '$' + GAME_STATE.locUsed.toLocaleString();
+        document.getElementById('bankRepayMax').textContent = '$' + maxRepay.toLocaleString();
+        document.getElementById('bankRepayAmount').max = maxRepay;
+        document.getElementById('bankRepayAmount').value = Math.min(maxRepay, GAME_STATE.locUsed);
+        this.updateRepayCalc();
+
+        document.getElementById('bankRepayPanel').style.display = 'block';
+    },
+
+    /**
+     * Update repay calculation
+     */
+    updateRepayCalc() {
+        const amount = parseInt(document.getElementById('bankRepayAmount').value) || 0;
+        const newFunds = GAME_STATE.practiceFunds - amount;
+        const newLocUsed = GAME_STATE.locUsed - amount;
+        const monthlyInterest = Math.round(newLocUsed * GAME_STATE.locInterestRate);
+
+        document.getElementById('bankRepayNewFunds').textContent = '$' + newFunds.toLocaleString();
+        document.getElementById('bankRepayNewLoc').textContent = '$' + newLocUsed.toLocaleString();
+        document.getElementById('bankRepaySavings').textContent = '$' + Math.round(amount * GAME_STATE.locInterestRate).toLocaleString() + '/month';
+    },
+
+    /**
+     * Execute repay
+     */
+    executeRepay() {
+        const amount = parseInt(document.getElementById('bankRepayAmount').value) || 0;
+
+        if (amount <= 0) {
+            alert('Please enter a valid amount!');
+            return;
+        }
+
+        if (amount > GAME_STATE.practiceFunds) {
+            alert('Insufficient funds to repay!');
+            return;
+        }
+
+        if (amount > GAME_STATE.locUsed) {
+            alert('Amount exceeds outstanding balance!');
+            return;
+        }
+
+        // Transfer from practice funds to LOC
+        GAME_STATE.practiceFunds -= amount;
+        GAME_STATE.locUsed -= amount;
+
+        console.log(`[BANK] Repaid $${amount.toLocaleString()} to LOC`);
+
+        // Close panel and update displays
+        this.closePanel();
+        GAME_STATE.updateHeader();
+        this.render();
+        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
+
+        alert(`Successfully repaid $${amount.toLocaleString()} to Line of Credit!`);
+    },
+
+    /**
+     * Close panels
+     */
+    closePanel() {
+        document.getElementById('bankDrawPanel').style.display = 'none';
+        document.getElementById('bankRepayPanel').style.display = 'none';
+    }
+};
+
+
+// ============================================================
+// SECTION 11: DEBUG PANEL
 // ============================================================
 
 const DebugPanel = {
@@ -1438,13 +1813,17 @@ const DebugPanel = {
 
         const data = GAME_STATE.currentMonthData;
 
+        const timeInfo = TimeManager.getMonthPeriod();
         let html = `
 <div class="debug-section">
 <h4>⏱ TIME SYSTEM</h4>
 <pre>
-Current Turn:   ${GAME_STATE.currentTurn} / 12
-Current Month:  ${GAME_STATE.currentMonth} (index: ${GAME_STATE.allMonthData.indexOf(GAME_STATE.currentMonthData)})
-Period:         ${GAME_STATE.currentTurn <= 6 ? 'Early' : 'Late'} (Turn ${GAME_STATE.currentTurn <= 6 ? GAME_STATE.currentTurn : GAME_STATE.currentTurn - 6}/6)
+Current Turn:   ${TimeManager.currentTurn} / ${TimeManager.TOTAL_TURNS}
+Month:          ${timeInfo.monthName} (index: ${timeInfo.monthIndex})
+Period:         ${timeInfo.periodName} (${timeInfo.period}/2)
+Display:        ${TimeManager.getDisplayString()}
+Remaining:      ${TimeManager.getRemainingTurns()} turns
+Month Boundary: ${TimeManager.isMonthBoundary() ? 'YES (interest will charge on next turn)' : 'No'}
 </pre>
 </div>
 
@@ -1457,6 +1836,8 @@ LOC Used:       $${GAME_STATE.locUsed.toLocaleString()}
 LOC Available:  $${(GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
 Buying Power:   $${(GAME_STATE.practiceFunds + GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
 Total P&L:      $${GAME_STATE.totalPL.toLocaleString()}
+Interest Paid:  $${GAME_STATE.totalInterestPaid.toLocaleString()}
+Interest Rate:  ${(GAME_STATE.locInterestRate * 100).toFixed(2)}% monthly
 Inventory:      ${GAME_STATE.inventory} MT
 </pre>
 </div>
@@ -1590,6 +1971,7 @@ document.addEventListener('DOMContentLoaded', () => {
     MarketsWidget.render();
     PositionsWidget.render();
     AnalyticsWidget.render();
+    BankWidget.render();
 
     // Initialize map
     MapWidget.init();
