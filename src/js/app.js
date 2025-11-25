@@ -38,6 +38,10 @@ const GAME_STATE = {
     init() {
         console.log('[GAME] Initializing...');
 
+        // Debug: Check what global data exists
+        console.log('[GAME] window.JANUARY_DATA:', window.JANUARY_DATA);
+        console.log('[GAME] JANUARY_DATA keys:', window.JANUARY_DATA ? Object.keys(window.JANUARY_DATA) : 'undefined');
+
         // Load all month data (from global variables set by data files)
         this.allMonthData = [
             window.JANUARY_DATA,
@@ -50,7 +54,8 @@ const GAME_STATE = {
 
         // Set current month data
         this.currentMonthData = this.allMonthData[0];
-        console.log('[GAME] Current month:', this.currentMonthData.MONTH);
+        console.log('[GAME] currentMonthData:', this.currentMonthData);
+        console.log('[GAME] Current month:', this.currentMonthData ? this.currentMonthData.MONTH : 'undefined');
 
         // Update header display
         this.updateHeader();
@@ -413,8 +418,18 @@ const MarketsWidget = {
         if (!container) return;
 
         const data = GAME_STATE.currentMonthData;
+        console.log('[MARKETS] Rendering with data:', data);
+        console.log('[MARKETS] data keys:', data ? Object.keys(data) : 'null');
+        console.log('[MARKETS] MARKET_DEPTH:', data ? data.MARKET_DEPTH : 'null');
+
         if (!data) {
             container.innerHTML = '<div class="empty-state">No data loaded</div>';
+            return;
+        }
+
+        if (!data.MARKET_DEPTH || !data.MARKET_DEPTH.SUPPLY) {
+            container.innerHTML = '<div class="empty-state">Data structure invalid - missing MARKET_DEPTH.SUPPLY</div>';
+            console.error('[MARKETS] Invalid data structure:', data);
             return;
         }
 
@@ -615,7 +630,11 @@ const FuturesWidget = {
         if (activeTab && activeTab.dataset.widget !== 'Futures') return;
 
         const data = GAME_STATE.currentMonthData;
-        if (!data || !data.PRICING) return;
+        console.log('[FUTURES] Rendering with data:', data);
+        if (!data || !data.PRICING) {
+            console.warn('[FUTURES] No data or PRICING missing');
+            return;
+        }
 
         let html = '';
 
@@ -933,7 +952,9 @@ const AnalyticsWidget = {
         const lmeData = [];
         const comexData = [];
 
-        GAME_STATE.allMonthData.forEach(data => {
+        console.log('[ANALYTICS] allMonthData:', GAME_STATE.allMonthData);
+        GAME_STATE.allMonthData.forEach((data, index) => {
+            console.log(`[ANALYTICS] Month ${index}:`, data);
             if (data && data.PRICING) {
                 labels.push(data.MONTH.substring(0, 3));
                 lmeData.push(data.PRICING.LME.SPOT_AVG);
