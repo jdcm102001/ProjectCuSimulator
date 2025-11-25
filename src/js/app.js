@@ -7,120 +7,234 @@
  */
 
 // ============================================================
-// SECTION 0A: NOTIFICATION SYSTEM
+// SECTION 0A: NOTIFICATION MANAGER (Bell System)
 // ============================================================
 
 /**
- * NotificationSystem provides styled popup notifications
- * for important game events like QP settlements
+ * NotificationManager handles the bell icon notification system
+ * Stores notifications, manages unread count, and renders dropdown
  */
-const NotificationSystem = {
+const NotificationManager = {
+    notifications: [],
+    unreadCount: 0,
+    isOpen: false,
+
     /**
-     * Show a QP Settlement notification with details
-     * @param {object} data - Settlement data
+     * Initialize notification manager
      */
-    showQPSettlement(data) {
-        const { monthName, purchasesProcessed, salesProcessed, totalPurchaseAdjustment, totalSaleAdjustment, netEffect } = data;
+    init() {
+        this.loadFromStorage();
+        this.bindEvents();
+        this.updateBadge();
+        this.renderList();
+        console.log('[NOTIF] NotificationManager initialized');
+    },
 
-        // Create modal overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'notification-overlay';
-        overlay.id = 'qpNotificationOverlay';
-
-        // Build content
-        let purchasesHtml = '';
-        if (purchasesProcessed > 0) {
-            const isUp = totalPurchaseAdjustment > 0;
-            purchasesHtml = `
-                <div class="qp-section purchases">
-                    <div class="qp-section-header">PURCHASES REPRICED</div>
-                    <div class="qp-count">${purchasesProcessed} position${purchasesProcessed > 1 ? 's' : ''}</div>
-                    <div class="qp-adjustment ${isUp ? 'negative' : 'positive'}">
-                        Cost ${isUp ? 'Increased' : 'Decreased'}: ${isUp ? '+' : ''}$${totalPurchaseAdjustment.toLocaleString()}
-                    </div>
-                    <div class="qp-explanation">${isUp ? 'Additional funds deducted' : 'Funds refunded to you'}</div>
-                </div>
-            `;
+    /**
+     * Bind event listeners
+     */
+    bindEvents() {
+        const bell = document.getElementById('notificationBell');
+        if (bell) {
+            bell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleDropdown();
+            });
         }
 
-        let salesHtml = '';
-        if (salesProcessed > 0) {
-            const isUp = totalSaleAdjustment > 0;
-            salesHtml = `
-                <div class="qp-section sales">
-                    <div class="qp-section-header">SALES REPRICED</div>
-                    <div class="qp-count">${salesProcessed} sale${salesProcessed > 1 ? 's' : ''}</div>
-                    <div class="qp-adjustment ${isUp ? 'positive' : 'negative'}">
-                        Revenue ${isUp ? 'Increased' : 'Decreased'}: ${isUp ? '+' : ''}$${totalSaleAdjustment.toLocaleString()}
-                    </div>
-                    <div class="qp-explanation">${isUp ? 'Additional revenue received' : 'Revenue adjusted down'}</div>
-                </div>
-            `;
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.notification-bell')) {
+                this.closeDropdown();
+            }
+        });
+
+        // Mark all read button
+        const markAllBtn = document.getElementById('markAllReadBtn');
+        if (markAllBtn) {
+            markAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.markAllAsRead();
+            });
+        }
+    },
+
+    /**
+     * Add a new notification
+     * @param {string} type - Notification type (qp-credit, qp-debit, cargo-arrived, etc.)
+     * @param {string} title - Notification title
+     * @param {string} message - Notification message
+     * @param {string} icon - Emoji icon
+     */
+    add(type, title, message, icon) {
+        const notification = {
+            id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+            type: type,
+            title: title,
+            message: message,
+            icon: icon,
+            turn: typeof TimeManager !== 'undefined' ? TimeManager.currentTurn : 1,
+            turnDisplay: typeof TimeManager !== 'undefined' ? TimeManager.getDisplayString() : 'Turn 1',
+            timestamp: new Date().toISOString(),
+            read: false
+        };
+
+        this.notifications.unshift(notification);
+        this.unreadCount++;
+        this.updateBadge();
+        this.saveToStorage();
+        this.renderList();
+
+        // Pulse animation on badge
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            badge.classList.add('new');
+            setTimeout(() => badge.classList.remove('new'), 1500);
         }
 
-        const netClass = netEffect >= 0 ? 'positive' : 'negative';
+        console.log(`[NOTIF] Added: ${title}`);
+    },
 
-        overlay.innerHTML = `
-            <div class="notification-modal qp-settlement">
-                <div class="notification-header">
-                    <span class="notification-icon">📊</span>
-                    <span class="notification-title">M+1 QP Settlement</span>
-                </div>
-                <div class="notification-subtitle">${monthName} Average Prices Revealed</div>
-                <div class="notification-body">
-                    ${purchasesHtml}
-                    ${salesHtml}
-                    <div class="qp-net-effect">
-                        <div class="qp-net-label">NET EFFECT ON FUNDS</div>
-                        <div class="qp-net-value ${netClass}">${netEffect >= 0 ? '+' : ''}$${netEffect.toLocaleString()}</div>
+    /**
+     * Mark single notification as read
+     * @param {string} notificationId - ID of notification to mark as read
+     */
+    markAsRead(notificationId) {
+        const notif = this.notifications.find(n => n.id === notificationId);
+        if (notif && !notif.read) {
+            notif.read = true;
+            this.unreadCount = Math.max(0, this.unreadCount - 1);
+            this.updateBadge();
+            this.saveToStorage();
+            this.renderList();
+        }
+    },
+
+    /**
+     * Mark all notifications as read
+     */
+    markAllAsRead() {
+        this.notifications.forEach(n => n.read = true);
+        this.unreadCount = 0;
+        this.updateBadge();
+        this.saveToStorage();
+        this.renderList();
+    },
+
+    /**
+     * Update badge display
+     */
+    updateBadge() {
+        const badge = document.getElementById('notificationBadge');
+        if (!badge) return;
+
+        if (this.unreadCount > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = this.unreadCount > 9 ? '9+' : this.unreadCount;
+        } else {
+            badge.style.display = 'none';
+        }
+    },
+
+    /**
+     * Toggle dropdown visibility
+     */
+    toggleDropdown() {
+        const dropdown = document.getElementById('notificationDropdown');
+        if (!dropdown) return;
+
+        this.isOpen = !this.isOpen;
+        dropdown.style.display = this.isOpen ? 'block' : 'none';
+    },
+
+    /**
+     * Close dropdown
+     */
+    closeDropdown() {
+        const dropdown = document.getElementById('notificationDropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+            this.isOpen = false;
+        }
+    },
+
+    /**
+     * Render notification list
+     */
+    renderList() {
+        const list = document.getElementById('notificationList');
+        if (!list) return;
+
+        if (this.notifications.length === 0) {
+            list.innerHTML = '<div class="notification-empty">No notifications</div>';
+            return;
+        }
+
+        // Show most recent 20 notifications
+        const recentNotifs = this.notifications.slice(0, 20);
+
+        list.innerHTML = recentNotifs.map(notif => `
+            <div class="notification-item ${notif.read ? 'read' : 'unread'}"
+                 data-id="${notif.id}"
+                 onclick="NotificationManager.markAsRead('${notif.id}')">
+                <div class="notification-icon">${notif.icon}</div>
+                <div class="notification-content">
+                    <div class="notification-message">
+                        <strong>${notif.title}</strong>
+                        <p>${notif.message}</p>
                     </div>
-                </div>
-                <div class="notification-footer">
-                    <button class="notification-btn" onclick="NotificationSystem.closeQPNotification()">ACKNOWLEDGE</button>
+                    <div class="notification-time">${notif.turnDisplay}</div>
                 </div>
             </div>
-        `;
+        `).join('');
 
-        document.body.appendChild(overlay);
-
-        // Animate in
-        requestAnimationFrame(() => {
-            overlay.classList.add('visible');
-        });
-    },
-
-    /**
-     * Close the QP notification
-     */
-    closeQPNotification() {
-        const overlay = document.getElementById('qpNotificationOverlay');
-        if (overlay) {
-            overlay.classList.remove('visible');
-            setTimeout(() => overlay.remove(), 300);
+        // Update mark all read button visibility
+        const markAllBtn = document.getElementById('markAllReadBtn');
+        if (markAllBtn) {
+            markAllBtn.style.display = this.unreadCount > 0 ? 'block' : 'none';
         }
     },
 
     /**
-     * Show a simple toast notification
-     * @param {string} message - Message to display
-     * @param {string} type - 'success', 'warning', 'error', 'info'
+     * Save to localStorage
      */
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast-notification ${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
+    saveToStorage() {
+        try {
+            localStorage.setItem('perseverance_notifications', JSON.stringify(this.notifications));
+        } catch (e) {
+            console.warn('[NOTIF] Could not save to localStorage');
+        }
+    },
 
-        requestAnimationFrame(() => {
-            toast.classList.add('visible');
-        });
+    /**
+     * Load from localStorage
+     */
+    loadFromStorage() {
+        try {
+            const saved = localStorage.getItem('perseverance_notifications');
+            if (saved) {
+                this.notifications = JSON.parse(saved);
+                this.unreadCount = this.notifications.filter(n => !n.read).length;
+            }
+        } catch (e) {
+            console.warn('[NOTIF] Could not load from localStorage');
+        }
+    },
 
-        setTimeout(() => {
-            toast.classList.remove('visible');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+    /**
+     * Clear all notifications (for new game)
+     */
+    clearAll() {
+        this.notifications = [];
+        this.unreadCount = 0;
+        this.updateBadge();
+        this.saveToStorage();
+        this.renderList();
     }
 };
+
+// Make globally available
+window.NotificationManager = NotificationManager;
 
 // ============================================================
 // SECTION 0B: TIME MANAGER
@@ -511,7 +625,16 @@ const GAME_STATE = {
         this.locUsed += interest;
         this.totalInterestPaid += interest;
 
+        const monthName = TimeManager.getMonthPeriod().monthName;
         console.log(`[GAME] LOC Interest charged: $${interest.toLocaleString()}`);
+
+        // Send interest notification
+        NotificationManager.add(
+            'interest',
+            'Monthly Interest Charged',
+            `LOC interest of $${interest.toLocaleString()} has been charged for ${monthName}.`,
+            '🏦'
+        );
 
         // Check if LOC exceeded limit
         if (this.locUsed > this.lineOfCredit) {
@@ -533,7 +656,16 @@ const GAME_STATE = {
             this.monthlySalesLimits[region].used = 0;
         }
 
+        const monthName = TimeManager.getMonthPeriod().monthName;
         console.log('[GAME] Monthly purchase/sales limits reset');
+
+        // Send limits reset notification
+        NotificationManager.add(
+            'limits-reset',
+            'Monthly Limits Reset',
+            `Purchase and sale limits have reset for ${monthName}.`,
+            '🔄'
+        );
     },
 
     /**
@@ -678,23 +810,56 @@ const GAME_STATE = {
             );
         }
 
-        // ========== NOTIFY USER ==========
+        // ========== SEND NOTIFICATIONS ==========
         if (purchasesProcessed > 0 || salesProcessed > 0) {
-            // Net effect on funds: sale adjustment is direct, purchase adjustment was already applied
-            // For purchases: positive adjustment = cost MORE = bad
-            // For sales: positive adjustment = received MORE = good
-            const netEffect = totalSaleAdjustment - totalPurchaseAdjustment;
-
             console.log(`[QP] Total adjustments - Purchases: $${totalPurchaseAdjustment.toLocaleString()}, Sales: $${totalSaleAdjustment.toLocaleString()}`);
 
-            // Show styled notification popup
-            NotificationSystem.showQPSettlement({
-                monthName,
-                purchasesProcessed,
-                salesProcessed,
-                totalPurchaseAdjustment,
-                totalSaleAdjustment,
-                netEffect
+            // Get the M+1 price for notification messages
+            const m1Price = m1Data.PRICING.LME.SPOT_AVG;
+            const prevMonthName = TimeManager.MONTHS[currentMonthIndex - 1] || 'January';
+
+            // Add notifications for each purchase adjustment
+            this.purchasesCompleted.filter(p => p.qpRevealed && p.purchaseMonth === prevMonthName).forEach(purchase => {
+                const adj = purchase.costAdjustment || 0;
+                if (adj > 0) {
+                    // Cost went UP - Letter of Debit
+                    NotificationManager.add(
+                        'qp-debit',
+                        'QP Settlement: Letter of Debit',
+                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} purchase owes +$${adj.toLocaleString()} additional.`,
+                        '📉'
+                    );
+                } else if (adj < 0) {
+                    // Cost went DOWN - Letter of Credit (refund)
+                    NotificationManager.add(
+                        'qp-credit',
+                        'QP Settlement: Letter of Credit',
+                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} purchase received $${Math.abs(adj).toLocaleString()} credit.`,
+                        '💰'
+                    );
+                }
+            });
+
+            // Add notifications for each sale adjustment
+            this.salesCompleted.filter(s => s.qpRevealed && s.saleMonth === prevMonthName).forEach(sale => {
+                const adj = sale.adjustmentAmount || 0;
+                if (adj > 0) {
+                    // Revenue went UP - Letter of Credit
+                    NotificationManager.add(
+                        'qp-credit',
+                        'QP Settlement: Letter of Credit',
+                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} sale received +$${adj.toLocaleString()} credit.`,
+                        '💰'
+                    );
+                } else if (adj < 0) {
+                    // Revenue went DOWN - Letter of Debit
+                    NotificationManager.add(
+                        'qp-debit',
+                        'QP Settlement: Letter of Debit',
+                        `${monthName} M+1 revealed at $${m1Price.toLocaleString()}/MT. Your ${prevMonthName} sale owes -$${Math.abs(adj).toLocaleString()} adjustment.`,
+                        '📉'
+                    );
+                }
             });
 
             // Update UI
@@ -758,6 +923,14 @@ const GAME_STATE = {
                     pos.arrivedTurn = TimeManager.currentTurn;
                     this.inventory += pos.tonnage;
                     console.log('[GAME] Position arrived at', pos.currentPort, ':', pos.id);
+
+                    // Send cargo arrived notification
+                    NotificationManager.add(
+                        'cargo-arrived',
+                        'Cargo Arrived',
+                        `Your ${pos.tonnage} MT shipment from ${pos.originPort} has arrived at ${pos.destinationPortName || pos.destination}. Ready to sell.`,
+                        '🚢'
+                    );
                 }
             }
         });
@@ -2934,6 +3107,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize debug panel
     DebugPanel.init();
+
+    // Initialize notification manager
+    NotificationManager.init();
 
     // Render initial widgets
     MarketsWidget.render();

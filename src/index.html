@@ -54,8 +54,26 @@
             <span class="label">Pending QP</span>
             <span class="value qp-pending" id="headerQPPending">0 sales</span>
         </div>
+
+        <!-- Notification Bell -->
+        <div class="notification-bell" id="notificationBell">
+            <span class="bell-icon">🔔</span>
+            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+
+            <!-- Dropdown Panel -->
+            <div class="notification-dropdown" id="notificationDropdown" style="display: none;">
+                <div class="notification-header">
+                    <span class="notification-title">Notifications</span>
+                    <button class="mark-all-read" id="markAllReadBtn">Mark All Read</button>
+                </div>
+                <div class="notification-list" id="notificationList">
+                    <div class="notification-empty">No notifications</div>
+                </div>
+            </div>
+        </div>
+
         <button id="nextTurnBtn">NEXT TURN</button>
-        <button id="debugBtn" onclick="DebugPanel.toggle()" style="background:#333;color:#4caf50;">DEBUG</button>
+        <button id="debugBtn" onclick="EnhancedDebugPanel.toggle()" style="background:#333;color:#4caf50;">DEBUG</button>
     </header>
 
     <!-- MAIN CONTAINER -->
@@ -398,7 +416,7 @@
     </div>
 
     <!-- Main Application Script (cache-bust) -->
-    <script src="js/app.js?v=10"></script>
+    <script src="js/app.js?v=11"></script>
 
     <!-- Enhanced Debug Panel (Development Only) -->
     <script src="js/debug/debug-panel.js?v=4"></script>
