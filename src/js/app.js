@@ -7,7 +7,123 @@
  */
 
 // ============================================================
-// SECTION 0: TIME MANAGER
+// SECTION 0A: NOTIFICATION SYSTEM
+// ============================================================
+
+/**
+ * NotificationSystem provides styled popup notifications
+ * for important game events like QP settlements
+ */
+const NotificationSystem = {
+    /**
+     * Show a QP Settlement notification with details
+     * @param {object} data - Settlement data
+     */
+    showQPSettlement(data) {
+        const { monthName, purchasesProcessed, salesProcessed, totalPurchaseAdjustment, totalSaleAdjustment, netEffect } = data;
+
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'notification-overlay';
+        overlay.id = 'qpNotificationOverlay';
+
+        // Build content
+        let purchasesHtml = '';
+        if (purchasesProcessed > 0) {
+            const isUp = totalPurchaseAdjustment > 0;
+            purchasesHtml = `
+                <div class="qp-section purchases">
+                    <div class="qp-section-header">PURCHASES REPRICED</div>
+                    <div class="qp-count">${purchasesProcessed} position${purchasesProcessed > 1 ? 's' : ''}</div>
+                    <div class="qp-adjustment ${isUp ? 'negative' : 'positive'}">
+                        Cost ${isUp ? 'Increased' : 'Decreased'}: ${isUp ? '+' : ''}$${totalPurchaseAdjustment.toLocaleString()}
+                    </div>
+                    <div class="qp-explanation">${isUp ? 'Additional funds deducted' : 'Funds refunded to you'}</div>
+                </div>
+            `;
+        }
+
+        let salesHtml = '';
+        if (salesProcessed > 0) {
+            const isUp = totalSaleAdjustment > 0;
+            salesHtml = `
+                <div class="qp-section sales">
+                    <div class="qp-section-header">SALES REPRICED</div>
+                    <div class="qp-count">${salesProcessed} sale${salesProcessed > 1 ? 's' : ''}</div>
+                    <div class="qp-adjustment ${isUp ? 'positive' : 'negative'}">
+                        Revenue ${isUp ? 'Increased' : 'Decreased'}: ${isUp ? '+' : ''}$${totalSaleAdjustment.toLocaleString()}
+                    </div>
+                    <div class="qp-explanation">${isUp ? 'Additional revenue received' : 'Revenue adjusted down'}</div>
+                </div>
+            `;
+        }
+
+        const netClass = netEffect >= 0 ? 'positive' : 'negative';
+
+        overlay.innerHTML = `
+            <div class="notification-modal qp-settlement">
+                <div class="notification-header">
+                    <span class="notification-icon">📊</span>
+                    <span class="notification-title">M+1 QP Settlement</span>
+                </div>
+                <div class="notification-subtitle">${monthName} Average Prices Revealed</div>
+                <div class="notification-body">
+                    ${purchasesHtml}
+                    ${salesHtml}
+                    <div class="qp-net-effect">
+                        <div class="qp-net-label">NET EFFECT ON FUNDS</div>
+                        <div class="qp-net-value ${netClass}">${netEffect >= 0 ? '+' : ''}$${netEffect.toLocaleString()}</div>
+                    </div>
+                </div>
+                <div class="notification-footer">
+                    <button class="notification-btn" onclick="NotificationSystem.closeQPNotification()">ACKNOWLEDGE</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            overlay.classList.add('visible');
+        });
+    },
+
+    /**
+     * Close the QP notification
+     */
+    closeQPNotification() {
+        const overlay = document.getElementById('qpNotificationOverlay');
+        if (overlay) {
+            overlay.classList.remove('visible');
+            setTimeout(() => overlay.remove(), 300);
+        }
+    },
+
+    /**
+     * Show a simple toast notification
+     * @param {string} message - Message to display
+     * @param {string} type - 'success', 'warning', 'error', 'info'
+     */
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast-notification ${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.add('visible');
+        });
+
+        setTimeout(() => {
+            toast.classList.remove('visible');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+};
+
+// ============================================================
+// SECTION 0B: TIME MANAGER
 // ============================================================
 
 /**
@@ -569,24 +685,20 @@ const GAME_STATE = {
             // For sales: positive adjustment = received MORE = good
             const netEffect = totalSaleAdjustment - totalPurchaseAdjustment;
 
-            let message = `M+1 QP Reveal for ${monthName}:\n\n`;
-
-            if (purchasesProcessed > 0) {
-                const purchaseEffect = totalPurchaseAdjustment > 0 ? 'INCREASE' : 'DECREASE';
-                message += `Purchases: ${purchasesProcessed} repriced\n`;
-                message += `  Cost ${purchaseEffect}: ${totalPurchaseAdjustment >= 0 ? '+' : ''}$${totalPurchaseAdjustment.toLocaleString()}\n\n`;
-            }
-
-            if (salesProcessed > 0) {
-                const saleEffect = totalSaleAdjustment > 0 ? 'GAIN' : 'LOSS';
-                message += `Sales: ${salesProcessed} repriced\n`;
-                message += `  Revenue ${saleEffect}: ${totalSaleAdjustment >= 0 ? '+' : ''}$${totalSaleAdjustment.toLocaleString()}\n\n`;
-            }
-
-            message += `Net Effect: ${netEffect >= 0 ? '+' : ''}$${netEffect.toLocaleString()}`;
-
             console.log(`[QP] Total adjustments - Purchases: $${totalPurchaseAdjustment.toLocaleString()}, Sales: $${totalSaleAdjustment.toLocaleString()}`);
-            alert(message);
+
+            // Show styled notification popup
+            NotificationSystem.showQPSettlement({
+                monthName,
+                purchasesProcessed,
+                salesProcessed,
+                totalPurchaseAdjustment,
+                totalSaleAdjustment,
+                netEffect
+            });
+
+            // Update UI
+            PositionsWidget.render();
         } else {
             console.log('[QP] No trades pending QP reveal for month index:', currentMonthIndex);
         }
@@ -1297,6 +1409,47 @@ const PositionsWidget = {
         }
         html += '</div>';
 
+        // Purchases Pending QP
+        const pendingPurchases = GAME_STATE.purchasesPendingQP || [];
+        if (pendingPurchases.length > 0) {
+            html += '<div class="markets-section">';
+            html += '<h4>PURCHASES PENDING QP REVEAL</h4>';
+            pendingPurchases.forEach(purchase => {
+                const qpMonth = TimeManager.MONTHS[purchase.qpMonthIndex] || 'N/A';
+                html += `
+                    <div class="position-card pending-qp purchase">
+                        <div class="position-header">
+                            <span class="position-id">${purchase.id || purchase.positionId}</span>
+                            <span class="status-badge pending">PENDING QP</span>
+                        </div>
+                        <div class="position-details">
+                            <div class="detail-row">
+                                <span class="label">Purchased:</span>
+                                <span>${purchase.tonnage} MT from ${purchase.supplier}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">QP Reveals:</span>
+                                <span class="highlight">${qpMonth} Early</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Prov. Base:</span>
+                                <span>$${purchase.provisionalBasePrice?.toLocaleString()}/MT</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Premium (Fixed):</span>
+                                <span>$${purchase.premium?.toLocaleString()}/MT</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="label">Prov. Total:</span>
+                                <span>$${purchase.totalCost?.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        }
+
         // Sales Pending QP
         const pendingQP = GAME_STATE.salesPendingQP || [];
         if (pendingQP.length > 0) {
@@ -1305,7 +1458,7 @@ const PositionsWidget = {
             pendingQP.forEach(sale => {
                 const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
                 html += `
-                    <div class="position-card pending-qp">
+                    <div class="position-card pending-qp sale">
                         <div class="position-header">
                             <span class="position-id">${sale.id}</span>
                             <span class="status-badge pending">PENDING QP</span>
@@ -1321,11 +1474,11 @@ const PositionsWidget = {
                             </div>
                             <div class="detail-row">
                                 <span class="label">Est. Revenue:</span>
-                                <span>$${sale.estimatedRevenue.toLocaleString()}</span>
+                                <span>$${sale.estimatedRevenue?.toLocaleString()}</span>
                             </div>
                             <div class="detail-row">
                                 <span class="label">Est. Profit:</span>
-                                <span class="${sale.estimatedProfit >= 0 ? 'positive' : 'negative'}">$${sale.estimatedProfit.toLocaleString()}</span>
+                                <span class="${sale.estimatedProfit >= 0 ? 'positive' : 'negative'}">$${sale.estimatedProfit?.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -1448,10 +1601,7 @@ const PositionsWidget = {
                         <span>${pos.supplier} (${pos.originPort})</span>
                     </div>
                     ${locationHtml}
-                    <div class="detail-row">
-                        <span class="label">Cost Basis:</span>
-                        <span>$${pos.pricePerMT.toLocaleString()}/MT ($${pos.totalCost.toLocaleString()} total)</span>
-                    </div>
+                    ${this.renderCostBasis(pos)}
                     <div class="detail-row">
                         <span class="label">Terms:</span>
                         <span>${pos.shippingTerms} | ${pos.exchange}</span>
@@ -1464,6 +1614,56 @@ const PositionsWidget = {
                 ${actionHtml}
             </div>
         `;
+    },
+
+    /**
+     * Render cost basis with provisional/final M+1 pricing info
+     */
+    renderCostBasis(pos) {
+        // Check if this position has M+1 pricing info
+        const hasM1Pricing = pos.provisionalBasePrice !== undefined;
+
+        if (!hasM1Pricing) {
+            // Legacy position without M+1 tracking
+            return `
+                <div class="detail-row">
+                    <span class="label">Cost Basis:</span>
+                    <span>$${pos.pricePerMT?.toLocaleString()}/MT ($${pos.totalCost?.toLocaleString()} total)</span>
+                </div>
+            `;
+        }
+
+        // Position has M+1 pricing - check if QP revealed
+        if (pos.qpRevealed) {
+            // QP has been revealed - show final pricing
+            const adjustment = pos.costAdjustment || 0;
+            const adjClass = adjustment <= 0 ? 'positive' : 'negative';
+            const adjSign = adjustment > 0 ? '+' : '';
+            return `
+                <div class="detail-row">
+                    <span class="label">Final Cost:</span>
+                    <span>$${pos.actualPricePerMT?.toLocaleString()}/MT ($${pos.actualTotalCost?.toLocaleString()} total)</span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">M+1 Adjustment:</span>
+                    <span class="${adjClass}">${adjSign}$${adjustment.toLocaleString()} ${adjustment > 0 ? '(cost up)' : adjustment < 0 ? '(cost down)' : ''}</span>
+                </div>
+            `;
+        } else {
+            // QP not yet revealed - show provisional with pending notice
+            const qpMonthIndex = pos.qpMonthIndex || (TimeManager.MONTHS.indexOf(pos.purchaseMonth) + 1);
+            const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
+            return `
+                <div class="detail-row">
+                    <span class="label">Provisional Cost:</span>
+                    <span>$${pos.pricePerMT?.toLocaleString()}/MT ($${pos.totalCost?.toLocaleString()} total)</span>
+                </div>
+                <div class="detail-row qp-pending-row">
+                    <span class="label">Final Price:</span>
+                    <span class="qp-pending-badge">⏳ PENDING - Reveals ${qpMonth} Early</span>
+                </div>
+            `;
+        }
     }
 };
 
