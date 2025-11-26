@@ -156,22 +156,36 @@ const AdminPanel = {
      * Initialize sub-modules with current simulation data
      */
     initializeModules() {
+        console.log('[AdminPanel] ═══════════════════════════════════════');
+        console.log('[AdminPanel] initializeModules() called');
+        console.log('[AdminPanel] currentSimulation:', this.currentSimulation);
+        console.log('[AdminPanel] currentSimulation.pricing:', this.currentSimulation?.pricing);
+        console.log('[AdminPanel] currentSimulation.supply:', this.currentSimulation?.supply);
+        console.log('[AdminPanel] currentSimulation.demand:', this.currentSimulation?.demand);
+
         // Initialize pricing graph
+        console.log('[AdminPanel] Calling AdminPricing.init()...');
         AdminPricing.init(this.currentSimulation);
 
         // Initialize timeline editor system
         if (window.TimelineEditor) {
+            console.log('[AdminPanel] Calling TimelineEditor.init()...');
             TimelineEditor.init();
             // Load events from current simulation
             if (this.currentSimulation?.events) {
+                console.log('[AdminPanel] Loading', this.currentSimulation.events.length, 'events');
                 TimelineEditor.loadEvents(this.currentSimulation.events);
             }
         }
 
         // Populate supply/demand forms
+        console.log('[AdminPanel] Calling populateSupplyForms()...');
         this.populateSupplyForms();
+        console.log('[AdminPanel] Calling populateDemandForms()...');
         this.populateDemandForms();
+        console.log('[AdminPanel] Calling populateSettingsForms()...');
         this.populateSettingsForms();
+        console.log('[AdminPanel] ═══════════════════════════════════════');
     },
 
     /**
@@ -201,7 +215,12 @@ const AdminPanel = {
      */
     populateSupplyForms() {
         const container = document.getElementById('supplyConfig');
-        if (!container) return;
+        if (!container) {
+            console.error('[AdminPanel] supplyConfig container NOT FOUND');
+            return;
+        }
+
+        console.log('[AdminPanel] populateSupplyForms - container found');
 
         const months = ['January', 'February', 'March', 'April', 'May', 'June'];
         let html = '';
@@ -209,6 +228,7 @@ const AdminPanel = {
         months.forEach((monthName, idx) => {
             const month = idx + 1;
             const supply = this.currentSimulation?.supply?.[month] || AdminStorage.DEFAULT_SIMULATION.supply[month];
+            console.log(`[AdminPanel] Supply month ${month}:`, supply);
 
             html += `
                 <div class="month-config" data-month="${month}">
@@ -252,6 +272,13 @@ const AdminPanel = {
         });
 
         container.innerHTML = html;
+        console.log('[AdminPanel] populateSupplyForms - HTML inserted, verifying...');
+
+        // Verify the values were set correctly
+        const firstSupplier = document.querySelector('.supply-supplier[data-month="1"]');
+        const firstMax = document.querySelector('.supply-max[data-month="1"]');
+        console.log('[AdminPanel] Month 1 supplier select value:', firstSupplier?.value);
+        console.log('[AdminPanel] Month 1 max tonnage value:', firstMax?.value);
     },
 
     /**
@@ -259,7 +286,12 @@ const AdminPanel = {
      */
     populateDemandForms() {
         const container = document.getElementById('demandConfig');
-        if (!container) return;
+        if (!container) {
+            console.error('[AdminPanel] demandConfig container NOT FOUND');
+            return;
+        }
+
+        console.log('[AdminPanel] populateDemandForms - container found');
 
         const months = ['January', 'February', 'March', 'April', 'May', 'June'];
         let html = '';
@@ -309,6 +341,13 @@ const AdminPanel = {
         });
 
         container.innerHTML = html;
+        console.log('[AdminPanel] populateDemandForms - HTML inserted, verifying...');
+
+        // Verify the values were set correctly
+        const firstBuyer = document.querySelector('.demand-buyer[data-month="1"]');
+        const firstMax = document.querySelector('.demand-max[data-month="1"]');
+        console.log('[AdminPanel] Month 1 buyer select value:', firstBuyer?.value);
+        console.log('[AdminPanel] Month 1 max tonnage value:', firstMax?.value);
     },
 
     /**
@@ -330,8 +369,12 @@ const AdminPanel = {
      * Populate settings forms
      */
     populateSettingsForms() {
+        console.log('[AdminPanel] populateSettingsForms called');
         const settings = this.currentSimulation?.settings || AdminStorage.DEFAULT_SIMULATION.settings;
         const metadata = this.currentSimulation?.metadata || AdminStorage.DEFAULT_SIMULATION.metadata;
+
+        console.log('[AdminPanel] Settings to apply:', settings);
+        console.log('[AdminPanel] Metadata to apply:', metadata);
 
         // Metadata
         const nameInput = document.getElementById('simName');
@@ -354,6 +397,12 @@ const AdminPanel = {
         if (interestInput) interestInput.value = settings.interestRate;
         if (marginInput) marginInput.value = settings.marginRequirement;
         if (timerInput) timerInput.value = settings.timerMinutes;
+
+        // Verify values were set
+        console.log('[AdminPanel] Settings applied:');
+        console.log('[AdminPanel]   simName:', nameInput?.value, '(element exists:', !!nameInput, ')');
+        console.log('[AdminPanel]   startingFunds:', fundsInput?.value, '(element exists:', !!fundsInput, ')');
+        console.log('[AdminPanel]   locLimit:', locInput?.value, '(element exists:', !!locInput, ')');
     },
 
     /**
