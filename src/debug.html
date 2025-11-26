@@ -260,14 +260,42 @@ COMEX Spot: $${data.PRICING.COMEX.SPOT_AVG}`;
 function checkDataLoad() {
     let result = '=== DATA LOAD CHECK ===\n\n';
 
+    // Initialize ScenarioLoader first (checks URL params)
+    ScenarioLoader.init();
+
+    // Log current URL for debugging
+    console.log('[DEBUG] Current URL:', window.location.href);
+    console.log('[DEBUG] URL search params:', window.location.search);
+
+    // Check what's actually in localStorage
+    console.log('[DEBUG] localStorage slots:');
+    for (let i = 1; i <= 3; i++) {
+        const key = `simulation_slot_${i}`;
+        const data = localStorage.getItem(key);
+        if (data) {
+            try {
+                const parsed = JSON.parse(data);
+                console.log(`[DEBUG]   Slot ${i}: "${parsed.metadata?.name}" - LME Month 1: ${parsed.pricing?.lme?.[1]?.average}`);
+            } catch (e) {
+                console.log(`[DEBUG]   Slot ${i}: (invalid JSON)`);
+            }
+        } else {
+            console.log(`[DEBUG]   Slot ${i}: (empty)`);
+        }
+    }
+
     // Use ScenarioLoader to load the selected scenario
     const isCustom = ScenarioLoader.loadSelectedScenario();
     const selectedSlot = ScenarioLoader.getSelectedSlot();
     const metadata = ScenarioLoader.getMetadata();
 
+    console.log('[DEBUG] isCustom:', isCustom);
+    console.log('[DEBUG] selectedSlot:', selectedSlot);
+
     result += `SCENARIO: ${metadata.name}\n`;
     result += `SLOT: ${selectedSlot} (${isCustom ? 'Custom' : 'Default'})\n`;
-    result += `DIFFICULTY: ${metadata.difficulty || 'Medium'}\n\n`;
+    result += `DIFFICULTY: ${metadata.difficulty || 'Medium'}\n`;
+    result += `URL: ${window.location.search || '(no params)'}\n\n`;
 
     // Get all month data from ScenarioLoader
     const allMonthData = ScenarioLoader.getAllMonthData();
