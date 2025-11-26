@@ -77,15 +77,6 @@ const AdminPanel = {
 
         // Password update
         document.getElementById('updatePasswordBtn')?.addEventListener('click', () => this.updatePassword());
-
-        // Event modal
-        document.getElementById('eventSaveBtn')?.addEventListener('click', () => AdminEvents.saveEvent());
-        document.getElementById('eventDeleteBtn')?.addEventListener('click', () => {
-            if (AdminEvents.editingEvent) {
-                AdminEvents.deleteEvent(AdminEvents.editingEvent.id);
-            }
-        });
-        document.getElementById('eventCancelBtn')?.addEventListener('click', () => AdminEvents.closeEventModal());
     },
 
     /**
@@ -168,8 +159,17 @@ const AdminPanel = {
         // Initialize pricing graph
         AdminPricing.init(this.currentSimulation);
 
-        // Initialize events
-        AdminEvents.init(this.currentSimulation);
+        // Initialize new event builder system
+        if (window.MultiGraph) {
+            MultiGraph.init();
+        }
+        if (window.EventBuilder) {
+            EventBuilder.init();
+            // Load events from current simulation
+            if (this.currentSimulation?.events) {
+                EventStorage.setEventsData(this.currentSimulation.events);
+            }
+        }
 
         // Populate supply/demand forms
         this.populateSupplyForms();
@@ -375,7 +375,7 @@ const AdminPanel = {
             pricing: AdminPricing.getPricesData(),
             supply: {},
             demand: {},
-            events: AdminEvents.getEventsData(),
+            events: window.EventStorage ? EventStorage.getEventsData() : [],
             settings: {
                 startingFunds: parseFloat(document.getElementById('startingFunds')?.value) || 200000,
                 locLimit: parseFloat(document.getElementById('locLimit')?.value) || 200000,
@@ -541,15 +541,17 @@ const AdminPanel = {
 
         // Events summary
         const eventsList = document.getElementById('previewEventsList');
-        if (simData.events.length === 0) {
+        if (!simData.events || simData.events.length === 0) {
             eventsList.innerHTML = '<li>No events configured</li>';
         } else {
             let eventsHtml = '';
             simData.events.forEach(e => {
-                const start = AdminStorage.PERIODS[e.startPeriod - 1]?.name || e.startPeriod;
-                const end = AdminStorage.PERIODS[e.endPeriod - 1]?.name || e.endPeriod;
-                const arrow = e.sentiment === 'bullish' ? '↑' : e.sentiment === 'bearish' ? '↓' : '→';
-                eventsHtml += `<li>"${e.name}" (${start} to ${end}) - ${e.sentiment}, ${e.severity} ${arrow}</li>`;
+                const startMonth = Math.ceil(e.startPeriod / 2);
+                const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+                const monthName = months[startMonth] || `M${startMonth}`;
+                const typeLabel = e.type === 'news' ? '📰' : '⚡';
+                const affectsCount = e.affects?.length || 0;
+                eventsHtml += `<li>${typeLabel} "${e.name}" (${monthName}) - ${affectsCount} effect${affectsCount !== 1 ? 's' : ''}</li>`;
             });
             eventsList.innerHTML = eventsHtml;
         }

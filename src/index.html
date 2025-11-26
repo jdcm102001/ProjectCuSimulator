@@ -10,6 +10,7 @@
 
     <!-- Admin Panel CSS -->
     <link rel="stylesheet" href="css/admin-panel.css">
+    <link rel="stylesheet" href="css/event-builder.css">
 
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
@@ -233,42 +234,147 @@
                 </div>
             </div>
 
-            <!-- EVENTS TAB -->
+            <!-- EVENTS TAB - NEW EVENT BUILDER -->
             <div class="tab-content" id="tab-events">
-                <h2>Events Timeline</h2>
-                <p class="tab-description">
-                    Create market events that affect prices. Click "+ ADD EVENT" to create, click events to edit, right-click to delete.
-                </p>
+                <div class="event-builder" id="eventBuilder">
 
-                <div class="events-container">
-                    <div class="gantt-chart">
-                        <div class="gantt-header">
-                            <div class="gantt-header-cell event-name">Event</div>
-                            <div class="gantt-header-cell">Jan-E</div>
-                            <div class="gantt-header-cell">Jan-L</div>
-                            <div class="gantt-header-cell">Feb-E</div>
-                            <div class="gantt-header-cell">Feb-L</div>
-                            <div class="gantt-header-cell">Mar-E</div>
-                            <div class="gantt-header-cell">Mar-L</div>
-                            <div class="gantt-header-cell">Apr-E</div>
-                            <div class="gantt-header-cell">Apr-L</div>
-                            <div class="gantt-header-cell">May-E</div>
-                            <div class="gantt-header-cell">May-L</div>
-                            <div class="gantt-header-cell">Jun-E</div>
-                            <div class="gantt-header-cell">Jun-L</div>
+                  <!-- TOP ROW: Block Palette + Workspace -->
+                  <div class="builder-top-row">
+
+                    <!-- BLOCK PALETTE (Left Side) -->
+                    <div class="block-palette" id="blockPalette">
+                      <h4>Blocks</h4>
+
+                      <div class="palette-section">
+                        <div class="palette-label">Events</div>
+
+                        <div class="palette-block" draggable="true" data-block-type="news">
+                          <div class="block-icon">📰</div>
+                          <div class="block-name">News</div>
+                          <div class="block-desc">Foreshadowing</div>
                         </div>
-                        <div class="gantt-body" id="ganttBody">
-                            <div class="gantt-empty">No events configured. Click "+ ADD EVENT" to create one.</div>
+
+                        <div class="palette-block" draggable="true" data-block-type="event">
+                          <div class="block-icon">📦</div>
+                          <div class="block-name">Event</div>
+                          <div class="block-desc">Main event</div>
                         </div>
+                      </div>
+
+                      <div class="palette-section">
+                        <div class="palette-label">Quick Add</div>
+                        <p class="palette-hint">Click any graph line to add an effect</p>
+                      </div>
+
+                      <div class="palette-section">
+                        <div class="palette-label">Templates</div>
+
+                        <div class="palette-block template" draggable="true" data-template="mine-strike">
+                          <div class="block-icon">⛏️</div>
+                          <div class="block-name">Mine Strike</div>
+                        </div>
+
+                        <div class="palette-block template" draggable="true" data-template="stimulus">
+                          <div class="block-icon">💰</div>
+                          <div class="block-name">Stimulus</div>
+                        </div>
+
+                        <div class="palette-block template" draggable="true" data-template="rate-hike">
+                          <div class="block-icon">🏦</div>
+                          <div class="block-name">Rate Hike</div>
+                        </div>
+
+                        <div class="palette-block template" draggable="true" data-template="port-strike">
+                          <div class="block-icon">🚢</div>
+                          <div class="block-name">Port Strike</div>
+                        </div>
+                      </div>
                     </div>
 
-                    <button class="add-event-btn" id="addEventBtn">+ ADD EVENT</button>
+                    <!-- WORKSPACE (Right Side) -->
+                    <div class="block-workspace" id="blockWorkspace">
+                      <div class="workspace-header">
+                        <h4>Event Workspace</h4>
+                        <div class="workspace-actions">
+                          <button class="btn-small" onclick="EventBuilder.clearWorkspace()">Clear All</button>
+                          <button class="btn-small" onclick="EventBuilder.validateEvents()">Validate</button>
+                        </div>
+                      </div>
 
-                    <div class="events-legend">
-                        <span>&#x1F7E2; Green = Bullish (prices up)</span>
-                        <span>&#x1F534; Red = Bearish (prices down)</span>
-                        <span>&#x26AA; Gray = Neutral (informational)</span>
+                      <div class="workspace-area" id="workspaceArea">
+                        <div class="workspace-placeholder">
+                          Drag blocks here to create events
+                        </div>
+                      </div>
                     </div>
+
+                  </div>
+
+                  <!-- BOTTOM ROW: Live Graphs -->
+                  <div class="builder-bottom-row">
+                    <div class="graphs-header">
+                      <h4>Live Preview</h4>
+                      <div class="graph-legend">
+                        <span class="legend-item baseline">Baseline</span>
+                        <span class="legend-item effective">With Events</span>
+                      </div>
+                    </div>
+
+                    <div class="graphs-container" id="graphsContainer">
+
+                      <!-- GRAPH 1: Prices (LME + COMEX) -->
+                      <div class="graph-panel" data-graph="prices">
+                        <div class="graph-title">
+                          <span class="graph-icon">💵</span> Prices
+                          <span class="graph-lines">
+                            <span class="line-indicator lme">LME</span>
+                            <span class="line-indicator comex">COMEX</span>
+                          </span>
+                        </div>
+                        <canvas id="graphPrices" width="400" height="200"></canvas>
+                      </div>
+
+                      <!-- GRAPH 2: Supply & Demand -->
+                      <div class="graph-panel" data-graph="supplyDemand">
+                        <div class="graph-title">
+                          <span class="graph-icon">📦</span> Supply & Demand
+                          <span class="graph-lines">
+                            <span class="line-indicator callao">Callao</span>
+                            <span class="line-indicator antof">Antof</span>
+                            <span class="line-indicator americas">Amer</span>
+                            <span class="line-indicator asia">Asia</span>
+                            <span class="line-indicator europe">Eur</span>
+                          </span>
+                        </div>
+                        <canvas id="graphSupplyDemand" width="400" height="200"></canvas>
+                      </div>
+
+                      <!-- GRAPH 3: Shipping -->
+                      <div class="graph-panel" data-graph="shipping">
+                        <div class="graph-title">
+                          <span class="graph-icon">🚢</span> Shipping Rates
+                          <span class="graph-lines">
+                            <span class="line-indicator fob">FOB</span>
+                            <span class="line-indicator cif">CIF</span>
+                          </span>
+                        </div>
+                        <canvas id="graphShipping" width="400" height="200"></canvas>
+                      </div>
+
+                      <!-- GRAPH 4: Financial -->
+                      <div class="graph-panel" data-graph="financial">
+                        <div class="graph-title">
+                          <span class="graph-icon">🏦</span> Financial
+                          <span class="graph-lines">
+                            <span class="line-indicator interest">Interest %</span>
+                          </span>
+                        </div>
+                        <canvas id="graphFinancial" width="400" height="200"></canvas>
+                      </div>
+
+                    </div>
+                  </div>
+
                 </div>
             </div>
 
@@ -967,9 +1073,13 @@
     <script src="js/debug/debug-panel.js?v=5"></script>
 
     <!-- Admin Panel Scripts -->
-    <script src="js/admin/admin-storage.js?v=1"></script>
-    <script src="js/admin/admin-pricing.js?v=1"></script>
-    <script src="js/admin/admin-events.js?v=1"></script>
-    <script src="js/admin/admin-panel.js?v=1"></script>
+    <script src="js/admin/admin-storage.js?v=2"></script>
+    <script src="js/admin/admin-pricing.js?v=2"></script>
+    <script src="js/admin/admin-events.js?v=2"></script>
+    <!-- New Event Builder System -->
+    <script src="js/admin/event-storage.js?v=1"></script>
+    <script src="js/admin/multi-graph.js?v=1"></script>
+    <script src="js/admin/event-builder.js?v=1"></script>
+    <script src="js/admin/admin-panel.js?v=2"></script>
 </body>
 </html>
