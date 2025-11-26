@@ -255,7 +255,7 @@ const SaveLoadDebug = {
 
     // Check default slot (0)
     for (let i = 0; i <= 3; i++) {
-      const key = `perseverance_sim_slot_${i}`;
+      const key = `simulation_slot_${i}`;
       const saved = localStorage.getItem(key);
 
       if (saved) {
@@ -279,7 +279,7 @@ const SaveLoadDebug = {
    * Clear a slot
    */
   clearSlot(slotNumber) {
-    localStorage.removeItem(`perseverance_sim_slot_${slotNumber}`);
+    localStorage.removeItem(`simulation_slot_${slotNumber}`);
     console.log(`Slot ${slotNumber} cleared`);
   },
 
@@ -287,7 +287,7 @@ const SaveLoadDebug = {
    * Export slot data to console (for manual backup)
    */
   exportSlot(slotNumber) {
-    const saved = localStorage.getItem(`perseverance_sim_slot_${slotNumber}`);
+    const saved = localStorage.getItem(`simulation_slot_${slotNumber}`);
     if (saved) {
       console.log('Copy this JSON:');
       console.log(saved);

@@ -935,6 +935,10 @@ const ScenarioSelection = {
     }
 };
 
+// Export to window for global access
+window.AdminPanel = AdminPanel;
+window.ScenarioSelection = ScenarioSelection;
+
 // Initialize when DOM is ready
 if (typeof window !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
