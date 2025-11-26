@@ -813,15 +813,33 @@ const ScenarioSelection = {
             const effComex = effectivePricing.comex[month.num];
 
             if (effLme) {
-                month.data.PRICING.LME.SPOT_AVG = effLme.average;
-                month.data.PRICING.LME.EARLY = effLme.early;
-                month.data.PRICING.LME.LATE = effLme.late;
+                // Only SPOT_AVG exists in the actual data structure
+                month.data.PRICING.LME.SPOT_AVG = Math.round(effLme.average);
+                // Update futures based on same percentage change
+                const lmeRatio = effLme.average / (pricing.lme[month.num]?.average || effLme.average);
+                if (month.data.PRICING.LME.FUTURES_1M) {
+                    month.data.PRICING.LME.FUTURES_1M = Math.round(month.data.PRICING.LME.FUTURES_1M * lmeRatio);
+                }
+                if (month.data.PRICING.LME.FUTURES_3M) {
+                    month.data.PRICING.LME.FUTURES_3M = Math.round(month.data.PRICING.LME.FUTURES_3M * lmeRatio);
+                }
             }
 
             if (effComex) {
-                month.data.PRICING.COMEX.SPOT_AVG = effComex.average;
-                month.data.PRICING.COMEX.EARLY = effComex.early;
-                month.data.PRICING.COMEX.LATE = effComex.late;
+                month.data.PRICING.COMEX.SPOT_AVG = Math.round(effComex.average);
+                const comexRatio = effComex.average / (pricing.comex[month.num]?.average || effComex.average);
+                if (month.data.PRICING.COMEX.FUTURES_1M) {
+                    month.data.PRICING.COMEX.FUTURES_1M = Math.round(month.data.PRICING.COMEX.FUTURES_1M * comexRatio);
+                }
+                if (month.data.PRICING.COMEX.FUTURES_3M) {
+                    month.data.PRICING.COMEX.FUTURES_3M = Math.round(month.data.PRICING.COMEX.FUTURES_3M * comexRatio);
+                }
+            }
+
+            // Update M+1 pricing if it exists
+            if (month.data.PRICING.M_PLUS_1 && effLme && effComex) {
+                month.data.PRICING.M_PLUS_1.LME_AVG = Math.round(effLme.average * 1.02);
+                month.data.PRICING.M_PLUS_1.COMEX_AVG = Math.round(effComex.average * 1.02);
             }
 
             console.log(`[ScenarioSelection] Month ${month.num} pricing - LME: $${effLme?.average}, COMEX: $${effComex?.average}`);
@@ -830,6 +848,7 @@ const ScenarioSelection = {
 
     /**
      * Apply supply configuration to month data files
+     * Writes to MARKET_DEPTH.SUPPLY.PERUVIAN and MARKET_DEPTH.SUPPLY.CHILEAN
      */
     applySupplyToMonths(supply) {
         const months = [
@@ -842,30 +861,59 @@ const ScenarioSelection = {
         ];
 
         months.forEach(month => {
-            if (!month.data || !month.data.SUPPLY) {
-                console.warn(`[ScenarioSelection] Month ${month.num} supply data not found`);
+            if (!month.data || !month.data.MARKET_DEPTH || !month.data.MARKET_DEPTH.SUPPLY) {
+                console.warn(`[ScenarioSelection] Month ${month.num} MARKET_DEPTH.SUPPLY not found`);
                 return;
             }
 
             const sup = supply[month.num];
             if (!sup) return;
 
-            // Get supplier preset info
-            const supplierInfo = AdminStorage.SUPPLIERS[sup.supplier] || {};
+            const supplyData = month.data.MARKET_DEPTH.SUPPLY;
 
-            month.data.SUPPLY.SUPPLIER_NAME = sup.supplier;
-            month.data.SUPPLY.SUPPLIER_PORT = supplierInfo.port || 'Unknown';
-            month.data.SUPPLY.MIN_MT = sup.minMT;
-            month.data.SUPPLY.MAX_MT = sup.maxMT;
-            month.data.SUPPLY.SUPPLIER_PREMIUM = sup.premium;
-            month.data.SUPPLY.EXCHANGE = sup.exchange;
+            // Map admin supplier names to data structure keys
+            if (sup.supplier === 'CALLAO') {
+                // Enable Peruvian (Callao), disable Chilean
+                if (supplyData.PERUVIAN) {
+                    supplyData.PERUVIAN.IS_PRIMARY = true;
+                    supplyData.PERUVIAN.LTA_FIXED_MT = Math.min(sup.minMT, 5);
+                    supplyData.PERUVIAN.MAX_OPTIONAL_SPOT_MT = sup.maxMT - supplyData.PERUVIAN.LTA_FIXED_MT;
+                    supplyData.PERUVIAN.TOTAL_MAX_AVAILABLE_MT = sup.maxMT;
+                    supplyData.PERUVIAN.SUPPLIER_PREMIUM_USD = sup.premium;
+                }
+                if (supplyData.CHILEAN) {
+                    supplyData.CHILEAN.IS_PRIMARY = false;
+                    supplyData.CHILEAN.MIN_AVAILABLE_MT = 0;
+                    supplyData.CHILEAN.MAX_AVAILABLE_MT = 0;
+                }
+            } else if (sup.supplier === 'ANTOFAGASTA') {
+                // Enable Chilean (Antofagasta), disable Peruvian
+                if (supplyData.CHILEAN) {
+                    supplyData.CHILEAN.IS_PRIMARY = true;
+                    supplyData.CHILEAN.MIN_AVAILABLE_MT = sup.minMT;
+                    supplyData.CHILEAN.MAX_AVAILABLE_MT = sup.maxMT;
+                    supplyData.CHILEAN.SUPPLIER_PREMIUM_USD = sup.premium;
+                }
+                if (supplyData.PERUVIAN) {
+                    supplyData.PERUVIAN.IS_PRIMARY = false;
+                    supplyData.PERUVIAN.LTA_FIXED_MT = 0;
+                    supplyData.PERUVIAN.MAX_OPTIONAL_SPOT_MT = 0;
+                    supplyData.PERUVIAN.TOTAL_MAX_AVAILABLE_MT = 0;
+                }
+            }
 
-            console.log(`[ScenarioSelection] Month ${month.num} supply - ${sup.supplier}: ${sup.minMT}-${sup.maxMT} MT`);
+            // Update total market depth
+            const peruvianTotal = supplyData.PERUVIAN?.TOTAL_MAX_AVAILABLE_MT || 0;
+            const chileanTotal = supplyData.CHILEAN?.MAX_AVAILABLE_MT || 0;
+            supplyData.TOTAL_MARKET_DEPTH_MT = peruvianTotal + chileanTotal;
+
+            console.log(`[ScenarioSelection] Month ${month.num} supply - ${sup.supplier}: ${sup.minMT}-${sup.maxMT} MT, premium: $${sup.premium}`);
         });
     },
 
     /**
      * Apply demand configuration to month data files
+     * Writes to CLIENTS.OPPORTUNITIES array
      */
     applyDemandToMonths(demand) {
         const months = [
@@ -878,22 +926,43 @@ const ScenarioSelection = {
         ];
 
         months.forEach(month => {
-            if (!month.data || !month.data.DEMAND) {
-                console.warn(`[ScenarioSelection] Month ${month.num} demand data not found`);
+            if (!month.data || !month.data.CLIENTS || !month.data.CLIENTS.OPPORTUNITIES) {
+                console.warn(`[ScenarioSelection] Month ${month.num} CLIENTS.OPPORTUNITIES not found`);
                 return;
             }
 
             const dem = demand[month.num];
             if (!dem) return;
 
-            month.data.DEMAND.BUYER_REGION = dem.buyer;
-            month.data.DEMAND.BUYER_PORT = dem.port;
-            month.data.DEMAND.MIN_MT = dem.minMT;
-            month.data.DEMAND.MAX_MT = dem.maxMT;
-            month.data.DEMAND.BUYER_PREMIUM = dem.premium;
-            month.data.DEMAND.EXCHANGE = dem.exchange;
+            const opportunities = month.data.CLIENTS.OPPORTUNITIES;
 
-            console.log(`[ScenarioSelection] Month ${month.num} demand - ${dem.buyer}: ${dem.minMT}-${dem.maxMT} MT`);
+            // Find and update the matching buyer region, or set as primary
+            opportunities.forEach((opp, index) => {
+                if (opp.REGION === dem.buyer) {
+                    // This is our primary buyer for this month
+                    opp.IS_PRIMARY = true;
+                    opp.MIN_QUANTITY_MT = dem.minMT;
+                    opp.MAX_QUANTITY_MT = dem.maxMT;
+                    opp.REGIONAL_PREMIUM_USD = dem.premium;
+                    opp.REFERENCE_EXCHANGE = dem.exchange;
+                    if (dem.port) {
+                        opp.PORT_OF_DISCHARGE = dem.port;
+                    }
+                } else {
+                    // Not the primary buyer this month
+                    opp.IS_PRIMARY = false;
+                }
+            });
+
+            // Also update MARKET_DEPTH.DEMAND if it exists
+            if (month.data.MARKET_DEPTH && month.data.MARKET_DEPTH.DEMAND) {
+                const demandData = month.data.MARKET_DEPTH.DEMAND;
+                if (demandData[dem.buyer]) {
+                    demandData[dem.buyer].DEMAND_MT = dem.maxMT;
+                }
+            }
+
+            console.log(`[ScenarioSelection] Month ${month.num} demand - ${dem.buyer}: ${dem.minMT}-${dem.maxMT} MT, premium: $${dem.premium}`);
         });
     },
 
