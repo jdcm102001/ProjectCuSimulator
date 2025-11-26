@@ -33,9 +33,17 @@ const AdminPricing = {
     colors: {
         lme: '#4a9eff',
         comex: '#2ed573',
+        lmeBaseline: '#4a9eff80',  // Semi-transparent for dashed baseline
+        comexBaseline: '#2ed57380',
         grid: '#333',
         text: '#888',
         background: '#151525'
+    },
+
+    // Track effective prices (baseline + events)
+    effectivePrices: {
+        lme: {},
+        comex: {}
     },
 
     /**
@@ -306,6 +314,26 @@ const AdminPricing = {
     },
 
     /**
+     * Calculate effective prices with events applied
+     */
+    calculateEffectivePrices() {
+        // Get events from AdminEvents
+        const events = typeof AdminEvents !== 'undefined' ? AdminEvents.getEventsData() : [];
+
+        // Calculate effective prices
+        this.effectivePrices = AdminStorage.calculateEffectivePrices(this.prices, events);
+    },
+
+    /**
+     * Check if events affect pricing
+     */
+    hasEventImpacts() {
+        const events = typeof AdminEvents !== 'undefined' ? AdminEvents.getEventsData() : [];
+        // Filter for price-affecting events
+        return events.some(e => e.type === 'price' || e.sentiment);
+    },
+
+    /**
      * Render the graph
      */
     render() {
@@ -315,6 +343,9 @@ const AdminPricing = {
         const width = this.canvas.width;
         const height = this.canvas.height;
 
+        // Calculate effective prices with events
+        this.calculateEffectivePrices();
+
         // Clear
         ctx.fillStyle = this.colors.background;
         ctx.fillRect(0, 0, width, height);
@@ -322,11 +353,25 @@ const AdminPricing = {
         // Draw grid
         this.drawGrid();
 
-        // Draw lines and points
-        this.drawLine('lme');
-        this.drawLine('comex');
+        // If there are events affecting prices, draw baseline (dashed) and effective (solid)
+        if (this.hasEventImpacts()) {
+            // Draw baseline (dashed) lines first
+            this.drawBaselineLine('lme');
+            this.drawBaselineLine('comex');
 
-        // Draw points
+            // Draw effective (solid) lines
+            this.drawEffectiveLine('lme');
+            this.drawEffectiveLine('comex');
+
+            // Draw legend
+            this.drawLegend();
+        } else {
+            // No events - just draw normal lines
+            this.drawLine('lme');
+            this.drawLine('comex');
+        }
+
+        // Draw points (on baseline prices since those are draggable)
         this.drawPoints('lme');
         this.drawPoints('comex');
 
@@ -382,12 +427,13 @@ const AdminPricing = {
     },
 
     /**
-     * Draw price line
+     * Draw price line (normal, solid)
      */
     drawLine(exchange) {
         const ctx = this.ctx;
         ctx.strokeStyle = this.colors[exchange];
         ctx.lineWidth = 2;
+        ctx.setLineDash([]);
 
         ctx.beginPath();
         for (let month = 1; month <= 6; month++) {
@@ -401,6 +447,92 @@ const AdminPricing = {
             }
         }
         ctx.stroke();
+    },
+
+    /**
+     * Draw baseline price line (dashed, semi-transparent)
+     */
+    drawBaselineLine(exchange) {
+        const ctx = this.ctx;
+        ctx.strokeStyle = this.colors[exchange + 'Baseline'];
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]); // Dashed line pattern
+
+        ctx.beginPath();
+        for (let month = 1; month <= 6; month++) {
+            const x = this.monthToX(month);
+            const y = this.priceToY(this.prices[exchange][month].average);
+
+            if (month === 1) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash
+    },
+
+    /**
+     * Draw effective price line (solid, with event impacts)
+     */
+    drawEffectiveLine(exchange) {
+        const ctx = this.ctx;
+        ctx.strokeStyle = this.colors[exchange];
+        ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+
+        ctx.beginPath();
+        for (let month = 1; month <= 6; month++) {
+            const x = this.monthToX(month);
+            const y = this.priceToY(this.effectivePrices[exchange][month].average);
+
+            if (month === 1) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+    },
+
+    /**
+     * Draw legend explaining baseline vs effective
+     */
+    drawLegend() {
+        const ctx = this.ctx;
+        const x = this.canvas.width - this.padding.right - 150;
+        const y = this.padding.top + 10;
+
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(x - 10, y - 5, 160, 55);
+
+        // Baseline (dashed) legend
+        ctx.strokeStyle = '#888';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, y + 10);
+        ctx.lineTo(x + 30, y + 10);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#aaa';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Baseline (Admin Set)', x + 40, y + 14);
+
+        // Effective (solid) legend
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y + 35);
+        ctx.lineTo(x + 30, y + 35);
+        ctx.stroke();
+
+        ctx.fillStyle = '#fff';
+        ctx.fillText('Effective (+ Events)', x + 40, y + 39);
     },
 
     /**

@@ -605,13 +605,20 @@ const AdminPanel = {
  */
 const ScenarioSelection = {
     selectedSlot: 0,
+    hasStartedGame: false,
 
     /**
      * Show scenario selection screen
      */
     show() {
+        console.log('[ScenarioSelection] Showing scenario selection screen');
         this.renderScenarioList();
-        document.getElementById('scenarioSelection').style.display = 'flex';
+        const element = document.getElementById('scenarioSelection');
+        if (element) {
+            element.style.display = 'flex';
+        } else {
+            console.error('[ScenarioSelection] scenarioSelection element not found');
+        }
     },
 
     /**
@@ -733,22 +740,177 @@ const ScenarioSelection = {
      * Apply simulation data to game state
      */
     applySimulationToGame(sim) {
-        if (typeof GAME_STATE === 'undefined') return;
+        console.log('[ScenarioSelection] Applying simulation to game:', sim?.metadata?.name);
+
+        if (typeof GAME_STATE === 'undefined') {
+            console.warn('[ScenarioSelection] GAME_STATE not defined');
+            return;
+        }
 
         // Apply financial settings
         if (sim.settings) {
             GAME_STATE.practiceFunds = sim.settings.startingFunds || 200000;
             GAME_STATE.locLimit = sim.settings.locLimit || 200000;
             GAME_STATE.locUsed = 0;
+            console.log('[ScenarioSelection] Applied financial settings - Funds:', GAME_STATE.practiceFunds, 'LOC:', GAME_STATE.locLimit);
+        }
 
-            // Note: Interest rate and other settings would need integration
-            // into the existing game logic
+        // Apply pricing to month data
+        if (sim.pricing) {
+            this.applyPricingToMonths(sim.pricing, sim.events);
+        }
+
+        // Apply supply to month data
+        if (sim.supply) {
+            this.applySupplyToMonths(sim.supply);
+        }
+
+        // Apply demand to month data
+        if (sim.demand) {
+            this.applyDemandToMonths(sim.demand);
+        }
+
+        // Store events for event triggers during game
+        if (sim.events) {
+            this.applyEventsToMonths(sim.events);
         }
 
         // Store simulation data for other modules to access
         GAME_STATE.currentSimulation = sim;
 
         console.log('[ScenarioSelection] Applied simulation settings to GAME_STATE');
+    },
+
+    /**
+     * Apply pricing to month data files
+     */
+    applyPricingToMonths(pricing, events) {
+        // Calculate effective prices (baseline + event impacts)
+        const effectivePricing = AdminStorage.calculateEffectivePrices(pricing, events);
+
+        // Map month numbers to data objects
+        const months = [
+            { num: 1, data: window.JANUARY_DATA },
+            { num: 2, data: window.FEBRUARY_DATA },
+            { num: 3, data: window.MARCH_DATA },
+            { num: 4, data: window.APRIL_DATA },
+            { num: 5, data: window.MAY_DATA },
+            { num: 6, data: window.JUNE_DATA }
+        ];
+
+        months.forEach(month => {
+            if (!month.data || !month.data.PRICING) {
+                console.warn(`[ScenarioSelection] Month ${month.num} data not found`);
+                return;
+            }
+
+            const effLme = effectivePricing.lme[month.num];
+            const effComex = effectivePricing.comex[month.num];
+
+            if (effLme) {
+                month.data.PRICING.LME.SPOT_AVG = effLme.average;
+                month.data.PRICING.LME.EARLY = effLme.early;
+                month.data.PRICING.LME.LATE = effLme.late;
+            }
+
+            if (effComex) {
+                month.data.PRICING.COMEX.SPOT_AVG = effComex.average;
+                month.data.PRICING.COMEX.EARLY = effComex.early;
+                month.data.PRICING.COMEX.LATE = effComex.late;
+            }
+
+            console.log(`[ScenarioSelection] Month ${month.num} pricing - LME: $${effLme?.average}, COMEX: $${effComex?.average}`);
+        });
+    },
+
+    /**
+     * Apply supply configuration to month data files
+     */
+    applySupplyToMonths(supply) {
+        const months = [
+            { num: 1, data: window.JANUARY_DATA },
+            { num: 2, data: window.FEBRUARY_DATA },
+            { num: 3, data: window.MARCH_DATA },
+            { num: 4, data: window.APRIL_DATA },
+            { num: 5, data: window.MAY_DATA },
+            { num: 6, data: window.JUNE_DATA }
+        ];
+
+        months.forEach(month => {
+            if (!month.data || !month.data.SUPPLY) {
+                console.warn(`[ScenarioSelection] Month ${month.num} supply data not found`);
+                return;
+            }
+
+            const sup = supply[month.num];
+            if (!sup) return;
+
+            // Get supplier preset info
+            const supplierInfo = AdminStorage.SUPPLIERS[sup.supplier] || {};
+
+            month.data.SUPPLY.SUPPLIER_NAME = sup.supplier;
+            month.data.SUPPLY.SUPPLIER_PORT = supplierInfo.port || 'Unknown';
+            month.data.SUPPLY.MIN_MT = sup.minMT;
+            month.data.SUPPLY.MAX_MT = sup.maxMT;
+            month.data.SUPPLY.SUPPLIER_PREMIUM = sup.premium;
+            month.data.SUPPLY.EXCHANGE = sup.exchange;
+
+            console.log(`[ScenarioSelection] Month ${month.num} supply - ${sup.supplier}: ${sup.minMT}-${sup.maxMT} MT`);
+        });
+    },
+
+    /**
+     * Apply demand configuration to month data files
+     */
+    applyDemandToMonths(demand) {
+        const months = [
+            { num: 1, data: window.JANUARY_DATA },
+            { num: 2, data: window.FEBRUARY_DATA },
+            { num: 3, data: window.MARCH_DATA },
+            { num: 4, data: window.APRIL_DATA },
+            { num: 5, data: window.MAY_DATA },
+            { num: 6, data: window.JUNE_DATA }
+        ];
+
+        months.forEach(month => {
+            if (!month.data || !month.data.DEMAND) {
+                console.warn(`[ScenarioSelection] Month ${month.num} demand data not found`);
+                return;
+            }
+
+            const dem = demand[month.num];
+            if (!dem) return;
+
+            month.data.DEMAND.BUYER_REGION = dem.buyer;
+            month.data.DEMAND.BUYER_PORT = dem.port;
+            month.data.DEMAND.MIN_MT = dem.minMT;
+            month.data.DEMAND.MAX_MT = dem.maxMT;
+            month.data.DEMAND.BUYER_PREMIUM = dem.premium;
+            month.data.DEMAND.EXCHANGE = dem.exchange;
+
+            console.log(`[ScenarioSelection] Month ${month.num} demand - ${dem.buyer}: ${dem.minMT}-${dem.maxMT} MT`);
+        });
+    },
+
+    /**
+     * Apply events to month data for triggers
+     */
+    applyEventsToMonths(events) {
+        // Store events globally for the event trigger system
+        window.SIMULATION_EVENTS = events || [];
+
+        // Also organize by period for easy lookup
+        window.EVENTS_BY_PERIOD = {};
+        events.forEach(event => {
+            for (let period = event.startPeriod; period <= event.endPeriod; period++) {
+                if (!window.EVENTS_BY_PERIOD[period]) {
+                    window.EVENTS_BY_PERIOD[period] = [];
+                }
+                window.EVENTS_BY_PERIOD[period].push(event);
+            }
+        });
+
+        console.log(`[ScenarioSelection] Applied ${events.length} events to game`);
     },
 
     /**
@@ -774,7 +936,13 @@ if (typeof window !== 'undefined') {
         AdminPanel.init();
         ScenarioSelection.init();
 
-        // Optionally show scenario selection on load
-        // Uncomment to enable: ScenarioSelection.show();
+        // Show scenario selection on page load
+        // Allow direct game start via URL param ?quickstart=true
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('quickstart') !== 'true') {
+            ScenarioSelection.show();
+        }
+
+        console.log('[Admin] Module initialization complete');
     });
 }

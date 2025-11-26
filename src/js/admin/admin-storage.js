@@ -106,8 +106,72 @@ const AdminStorage = {
         }
     },
 
-    // Event types
+    // Event types with full configuration
     EVENT_TYPES: ['supply', 'demand', 'price', 'logistics', 'financial', 'news'],
+
+    // Event type configurations with effects
+    EVENT_TYPE_CONFIG: {
+        supply: {
+            name: 'Supply',
+            icon: '📦',
+            description: 'Affects supplier availability, tonnage, and premiums',
+            color: '#f59e0b',
+            effects: [
+                { key: 'affectedSupplier', label: 'Affected Supplier', type: 'dropdown', options: ['ALL', 'CALLAO', 'ANTOFAGASTA'], default: 'ALL' },
+                { key: 'tonnageImpact', label: 'Tonnage Impact (%)', type: 'number', default: 0, min: -100, max: 100 },
+                { key: 'supplierPremiumImpact', label: 'Supplier Premium ($/MT)', type: 'number', default: 0 }
+            ]
+        },
+        demand: {
+            name: 'Demand',
+            icon: '🏭',
+            description: 'Affects buyer requirements and premiums',
+            color: '#8b5cf6',
+            effects: [
+                { key: 'affectedBuyer', label: 'Affected Buyer', type: 'dropdown', options: ['ALL', 'AMERICAS', 'ASIA', 'EUROPE'], default: 'ALL' },
+                { key: 'tonnageImpact', label: 'Tonnage Impact (%)', type: 'number', default: 0, min: -100, max: 100 },
+                { key: 'buyerPremiumImpact', label: 'Buyer Premium ($/MT)', type: 'number', default: 0 }
+            ]
+        },
+        price: {
+            name: 'Price',
+            icon: '📈',
+            description: 'Directly affects spot and futures prices',
+            color: '#3b82f6',
+            effects: [
+                { key: 'sentiment', label: 'Sentiment', type: 'sentiment', default: 'bullish' },
+                { key: 'severity', label: 'Severity', type: 'severity', default: 'medium' }
+            ]
+        },
+        logistics: {
+            name: 'Logistics',
+            icon: '🚢',
+            description: 'Affects freight rates and travel times',
+            color: '#06b6d4',
+            effects: [
+                { key: 'affectedRoutes', label: 'Affected Routes', type: 'dropdown', options: ['ALL', 'TO_AMERICAS', 'TO_ASIA', 'TO_EUROPE', 'FROM_CALLAO', 'FROM_ANTOFAGASTA'], default: 'ALL' },
+                { key: 'freightRateImpact', label: 'Freight Rate Impact ($/MT)', type: 'number', default: 0 },
+                { key: 'travelTimeImpact', label: 'Travel Time (days)', type: 'number', default: 0, min: -10, max: 30 }
+            ]
+        },
+        financial: {
+            name: 'Financial',
+            icon: '🏦',
+            description: 'Affects interest rates and credit limits',
+            color: '#ec4899',
+            effects: [
+                { key: 'interestRateImpact', label: 'Interest Rate Change (%)', type: 'number', default: 0, step: 0.1 },
+                { key: 'locLimitImpact', label: 'LOC Limit Change ($)', type: 'number', default: 0, step: 10000 }
+            ]
+        },
+        news: {
+            name: 'News',
+            icon: '📰',
+            description: 'Informational only - no gameplay effect',
+            color: '#6b7280',
+            effects: []
+        }
+    },
 
     // Severity multipliers for event impacts
     SEVERITY_MULTIPLIERS: {
@@ -177,19 +241,27 @@ const AdminStorage = {
      * Load simulation from slot
      */
     loadSimulation(slotNumber) {
+        console.log('[AdminStorage] Loading slot:', slotNumber);
+
         if (slotNumber === 0) {
+            console.log('[AdminStorage] Returning default simulation');
             return this.getDefaultSimulation();
         }
 
         const key = `${this.STORAGE_PREFIX}${slotNumber}`;
         const saved = localStorage.getItem(key);
 
+        console.log('[AdminStorage] localStorage key:', key, '| Has data:', !!saved);
+
         if (!saved) {
+            console.log('[AdminStorage] No saved data found for slot', slotNumber);
             return null;
         }
 
         try {
-            return JSON.parse(saved);
+            const parsed = JSON.parse(saved);
+            console.log('[AdminStorage] Successfully parsed simulation:', parsed?.metadata?.name);
+            return parsed;
         } catch (e) {
             console.error('[AdminStorage] Error loading simulation:', e);
             return null;
@@ -200,13 +272,18 @@ const AdminStorage = {
      * Save simulation to slot
      */
     saveSimulation(slotNumber, simData) {
+        console.log('[AdminStorage] Saving to slot:', slotNumber);
+        console.log('[AdminStorage] Data to save:', simData?.metadata?.name);
+
         if (slotNumber === 0) {
+            console.warn('[AdminStorage] Cannot save to default slot');
             return { success: false, error: 'Cannot save to default slot (Slot 0)' };
         }
 
         // Validate
         const validation = this.validateSimulation(simData);
         if (validation.errors.length > 0) {
+            console.error('[AdminStorage] Validation errors:', validation.errors);
             return { success: false, errors: validation.errors, warnings: validation.warnings };
         }
 
@@ -221,11 +298,18 @@ const AdminStorage = {
         // Save
         const key = `${this.STORAGE_PREFIX}${slotNumber}`;
         try {
-            localStorage.setItem(key, JSON.stringify(simData));
+            const jsonStr = JSON.stringify(simData);
+            console.log('[AdminStorage] Saving to localStorage key:', key, '| Size:', jsonStr.length, 'chars');
+            localStorage.setItem(key, jsonStr);
+
+            // Verify save
+            const verifyRead = localStorage.getItem(key);
+            console.log('[AdminStorage] Save verified:', !!verifyRead);
+
             return { success: true, warnings: validation.warnings };
         } catch (e) {
             console.error('[AdminStorage] Error saving simulation:', e);
-            return { success: false, error: 'Failed to save simulation' };
+            return { success: false, error: 'Failed to save simulation: ' + e.message };
         }
     },
 
@@ -433,6 +517,61 @@ const AdminStorage = {
         } catch (e) {
             return { success: false, error: 'Invalid JSON format' };
         }
+    },
+
+    /**
+     * Calculate effective prices after applying all events
+     * Events PERMANENTLY change prices from their start period onward
+     */
+    calculateEffectivePrices(basePricing, events) {
+        // Deep copy base pricing
+        const effective = {
+            lme: {},
+            comex: {}
+        };
+
+        for (let month = 1; month <= 6; month++) {
+            effective.lme[month] = { ...basePricing.lme[month] };
+            effective.comex[month] = { ...basePricing.comex[month] };
+        }
+
+        // Filter to only price-type events (events with sentiment/severity that affect prices)
+        const priceEvents = (events || []).filter(e =>
+            e.type === 'price' || e.sentiment // Legacy events with sentiment
+        );
+
+        // Sort events by start period
+        priceEvents.sort((a, b) => a.startPeriod - b.startPeriod);
+
+        // Apply each event's impact PERMANENTLY from start period onward
+        priceEvents.forEach(event => {
+            const startMonth = Math.ceil(event.startPeriod / 2); // Convert period to month
+
+            // Calculate impact
+            const baseLme = basePricing.lme[startMonth]?.average || 9000;
+            const baseComex = basePricing.comex[startMonth]?.average || 10000;
+            const impacts = this.calculateEventImpacts(event.sentiment, event.severity, { lme: baseLme, comex: baseComex });
+
+            // Apply impact to all months from start month onward (PERMANENT)
+            for (let month = startMonth; month <= 6; month++) {
+                effective.lme[month].average += impacts.lmeSpot;
+                effective.lme[month].early += impacts.lmeSpot;
+                effective.lme[month].late += impacts.lmeSpot;
+
+                effective.comex[month].average += impacts.comexSpot;
+                effective.comex[month].early += impacts.comexSpot;
+                effective.comex[month].late += impacts.comexSpot;
+            }
+        });
+
+        return effective;
+    },
+
+    /**
+     * Get effect configuration for a specific event type
+     */
+    getEventTypeConfig(type) {
+        return this.EVENT_TYPE_CONFIG[type] || null;
     }
 };
 

@@ -488,6 +488,11 @@
     color: #888;
 }
 
+.gantt-event-name .type-icons {
+    font-size: 0.75rem;
+    margin-right: 2px;
+}
+
 .gantt-cells {
     display: contents;
 }
@@ -656,6 +661,103 @@
 
 .sentiment-option.neutral {
     color: #888;
+}
+
+/* Event type checkboxes */
+.event-types-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.event-type-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #0d0d1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.event-type-checkbox:hover {
+    border-color: #4a9eff;
+}
+
+.event-type-checkbox:has(input:checked) {
+    border-color: #4a9eff;
+    background: rgba(74, 158, 255, 0.1);
+}
+
+.event-type-checkbox input {
+    width: auto;
+    margin: 0;
+}
+
+.event-type-checkbox .type-icon {
+    font-size: 1.1rem;
+}
+
+/* Dynamic effects section */
+#eventEffectsContainer {
+    background: #0d0d1a;
+    border-radius: 6px;
+    padding: 15px;
+    min-height: 50px;
+}
+
+#eventEffectsContainer:empty::before {
+    content: 'Select event types above to configure their effects';
+    color: #666;
+    font-style: italic;
+}
+
+.effect-type-group {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #333;
+}
+
+.effect-type-group:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.effect-type-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4a9eff;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.effect-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.effect-row label {
+    flex: 1;
+    color: #888;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.effect-row input,
+.effect-row select {
+    width: 150px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+}
+
+.effect-row input[type="number"] {
+    width: 100px;
 }
 
 .event-impacts {

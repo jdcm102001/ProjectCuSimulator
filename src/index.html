@@ -448,15 +448,41 @@
             </div>
 
             <div class="event-form-group">
-                <label>Event Type:</label>
-                <select id="eventType">
-                    <option value="supply">Supply (affects available tonnage)</option>
-                    <option value="demand">Demand (affects buyer requirements)</option>
-                    <option value="price" selected>Price (affects spot prices)</option>
-                    <option value="logistics">Logistics (affects freight/travel)</option>
-                    <option value="financial">Financial (affects interest/LOC)</option>
-                    <option value="news">News (informational only)</option>
-                </select>
+                <label>Event Types (select all that apply):</label>
+                <div class="event-types-checkboxes" id="eventTypesCheckboxes">
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="price" checked>
+                        <span class="type-icon">📈</span> Price
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="supply">
+                        <span class="type-icon">📦</span> Supply
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="demand">
+                        <span class="type-icon">🏭</span> Demand
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="logistics">
+                        <span class="type-icon">🚢</span> Logistics
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="financial">
+                        <span class="type-icon">🏦</span> Financial
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="news">
+                        <span class="type-icon">📰</span> News
+                    </label>
+                </div>
+            </div>
+
+            <!-- Dynamic effects based on selected types -->
+            <div class="event-form-group" id="eventEffectsSection">
+                <label>Type-Specific Effects:</label>
+                <div id="eventEffectsContainer">
+                    <!-- Populated dynamically based on selected types -->
+                </div>
             </div>
 
             <div class="event-form-group">

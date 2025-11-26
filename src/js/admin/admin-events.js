@@ -80,6 +80,13 @@ const AdminEvents = {
         const arrowClass = event.sentiment === 'bullish' ? 'bullish' : event.sentiment === 'bearish' ? 'bearish' : 'neutral';
         const arrowIcon = event.sentiment === 'bullish' ? '↑' : event.sentiment === 'bearish' ? '↓' : '→';
 
+        // Get type icons
+        const types = event.types || [event.type] || ['price'];
+        const typeIcons = types.map(t => {
+            const config = AdminStorage.getEventTypeConfig(t);
+            return config?.icon || '❓';
+        }).join('');
+
         // Calculate bar position
         const startCol = event.startPeriod;
         const endCol = event.endPeriod;
@@ -93,7 +100,7 @@ const AdminEvents = {
                         <div id="event-bar-${event.id}"
                              class="gantt-bar ${arrowClass}"
                              style="width: 100%;"
-                             title="${event.name}: ${event.description || ''}">
+                             title="${event.name}: ${event.description || ''}\nTypes: ${types.join(', ')}">
                         </div>
                     </div>
                 `;
@@ -106,6 +113,7 @@ const AdminEvents = {
         return `
             <div class="gantt-row" data-event-id="${event.id}">
                 <div class="gantt-event-name">
+                    <span class="type-icons">${typeIcons}</span>
                     <span class="arrow ${arrowClass}">${arrowIcon}</span>
                     <span class="name">${this.truncateName(event.name)}</span>
                 </div>
@@ -138,11 +146,16 @@ const AdminEvents = {
 
         // Populate form
         document.getElementById('eventName').value = event?.name || '';
-        document.getElementById('eventType').value = event?.type || 'price';
         document.getElementById('eventDescription').value = event?.description || '';
         document.getElementById('eventStartPeriod').value = event?.startPeriod || 1;
         document.getElementById('eventEndPeriod').value = event?.endPeriod || 2;
         document.getElementById('eventSeverity').value = event?.severity || 'medium';
+
+        // Set event types (checkboxes)
+        const eventTypes = event?.types || ['price']; // Default to price
+        document.querySelectorAll('input[name="eventTypes"]').forEach(input => {
+            input.checked = eventTypes.includes(input.value);
+        });
 
         // Set sentiment
         const sentiment = event?.sentiment || 'bullish';
@@ -156,19 +169,114 @@ const AdminEvents = {
             deleteBtn.style.display = event ? 'block' : 'none';
         }
 
+        // Update dynamic effects section
+        this.updateEffectsSection(event?.effects || {});
+
         // Update impacts preview
         this.updateImpactsPreview();
 
         // Show modal
         modal.style.display = 'flex';
 
-        // Add form change listeners for live impact preview
+        // Add form change listeners
+        document.querySelectorAll('input[name="eventTypes"]').forEach(input => {
+            input.addEventListener('change', () => this.updateEffectsSection());
+        });
         ['eventSeverity'].forEach(id => {
-            document.getElementById(id).addEventListener('change', () => this.updateImpactsPreview());
+            document.getElementById(id)?.addEventListener('change', () => this.updateImpactsPreview());
         });
         document.querySelectorAll('input[name="eventSentiment"]').forEach(input => {
             input.addEventListener('change', () => this.updateImpactsPreview());
         });
+    },
+
+    /**
+     * Get selected event types from checkboxes
+     */
+    getSelectedTypes() {
+        const selected = [];
+        document.querySelectorAll('input[name="eventTypes"]:checked').forEach(input => {
+            selected.push(input.value);
+        });
+        return selected;
+    },
+
+    /**
+     * Update dynamic effects section based on selected types
+     */
+    updateEffectsSection(savedEffects = {}) {
+        const container = document.getElementById('eventEffectsContainer');
+        if (!container) return;
+
+        const selectedTypes = this.getSelectedTypes();
+
+        if (selectedTypes.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+
+        selectedTypes.forEach(type => {
+            const config = AdminStorage.getEventTypeConfig(type);
+            if (!config || config.effects.length === 0) return;
+
+            html += `<div class="effect-type-group" data-type="${type}">`;
+            html += `<div class="effect-type-header"><span>${config.icon}</span> ${config.name} Effects</div>`;
+
+            config.effects.forEach(effect => {
+                const savedValue = savedEffects[type]?.[effect.key] ?? effect.default;
+
+                html += `<div class="effect-row">`;
+                html += `<label>${effect.label}:</label>`;
+
+                if (effect.type === 'dropdown') {
+                    html += `<select class="effect-input" data-type="${type}" data-key="${effect.key}">`;
+                    effect.options.forEach(opt => {
+                        const selected = savedValue === opt ? 'selected' : '';
+                        html += `<option value="${opt}" ${selected}>${opt}</option>`;
+                    });
+                    html += `</select>`;
+                } else if (effect.type === 'number') {
+                    const min = effect.min !== undefined ? `min="${effect.min}"` : '';
+                    const max = effect.max !== undefined ? `max="${effect.max}"` : '';
+                    const step = effect.step !== undefined ? `step="${effect.step}"` : '';
+                    html += `<input type="number" class="effect-input" data-type="${type}" data-key="${effect.key}"
+                             value="${savedValue}" ${min} ${max} ${step}>`;
+                } else if (effect.type === 'sentiment') {
+                    // Handled by the main sentiment selector
+                    html += `<span style="color: #666;">(Use Sentiment selector above)</span>`;
+                } else if (effect.type === 'severity') {
+                    // Handled by the main severity selector
+                    html += `<span style="color: #666;">(Use Severity selector above)</span>`;
+                }
+
+                html += `</div>`;
+            });
+
+            html += `</div>`;
+        });
+
+        container.innerHTML = html || '<span style="color: #666;">No additional configuration needed for selected types.</span>';
+    },
+
+    /**
+     * Collect effects from dynamic form
+     */
+    collectEffects() {
+        const effects = {};
+        document.querySelectorAll('.effect-input').forEach(input => {
+            const type = input.dataset.type;
+            const key = input.dataset.key;
+            if (!effects[type]) effects[type] = {};
+
+            if (input.type === 'number') {
+                effects[type][key] = parseFloat(input.value) || 0;
+            } else {
+                effects[type][key] = input.value;
+            }
+        });
+        return effects;
     },
 
     /**
@@ -236,16 +344,21 @@ const AdminEvents = {
      */
     saveEvent() {
         const name = document.getElementById('eventName').value.trim();
-        const type = document.getElementById('eventType').value;
+        const types = this.getSelectedTypes();
         const description = document.getElementById('eventDescription').value.trim();
         const startPeriod = parseInt(document.getElementById('eventStartPeriod').value);
         const endPeriod = parseInt(document.getElementById('eventEndPeriod').value);
         const sentiment = document.querySelector('input[name="eventSentiment"]:checked')?.value || 'neutral';
         const severity = document.getElementById('eventSeverity').value;
+        const effects = this.collectEffects();
 
         // Validate
         if (!name) {
             alert('Event name is required');
+            return;
+        }
+        if (types.length === 0) {
+            alert('At least one event type must be selected');
             return;
         }
         if (endPeriod < startPeriod) {
@@ -253,12 +366,17 @@ const AdminEvents = {
             return;
         }
 
-        // Calculate impacts
+        // Calculate price impacts (for price-type events)
         const basePrices = {
             lme: AdminPricing?.prices?.lme?.[1]?.average || 9000,
             comex: AdminPricing?.prices?.comex?.[1]?.average || 10000
         };
-        const impacts = AdminStorage.calculateEventImpacts(sentiment, severity, basePrices);
+        const impacts = types.includes('price')
+            ? AdminStorage.calculateEventImpacts(sentiment, severity, basePrices)
+            : null;
+
+        // Use primary type for backwards compatibility (first selected)
+        const type = types[0];
 
         if (this.editingEvent) {
             // Update existing event
@@ -267,12 +385,14 @@ const AdminEvents = {
                 this.events[idx] = {
                     ...this.events[idx],
                     name,
-                    type,
+                    type, // Primary type for backwards compatibility
+                    types, // All selected types
                     description,
                     startPeriod,
                     endPeriod,
                     sentiment,
                     severity,
+                    effects, // Type-specific effects
                     impacts
                 };
             }
@@ -281,18 +401,25 @@ const AdminEvents = {
             this.events.push({
                 id: AdminStorage.generateEventId(),
                 name,
-                type,
+                type, // Primary type for backwards compatibility
+                types, // All selected types
                 description,
                 startPeriod,
                 endPeriod,
                 sentiment,
                 severity,
+                effects, // Type-specific effects
                 impacts
             });
         }
 
         this.closeEventModal();
         this.render();
+
+        // Trigger pricing graph re-render to show event effects
+        if (typeof AdminPricing !== 'undefined') {
+            AdminPricing.render();
+        }
     },
 
     /**
@@ -304,6 +431,11 @@ const AdminEvents = {
         this.events = this.events.filter(e => e.id !== eventId);
         this.closeEventModal();
         this.render();
+
+        // Trigger pricing graph re-render
+        if (typeof AdminPricing !== 'undefined') {
+            AdminPricing.render();
+        }
     },
 
     /**
