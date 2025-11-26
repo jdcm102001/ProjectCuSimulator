@@ -159,15 +159,12 @@ const AdminPanel = {
         // Initialize pricing graph
         AdminPricing.init(this.currentSimulation);
 
-        // Initialize new event builder system
-        if (window.MultiGraph) {
-            MultiGraph.init();
-        }
-        if (window.EventBuilder) {
-            EventBuilder.init();
+        // Initialize timeline editor system
+        if (window.TimelineEditor) {
+            TimelineEditor.init();
             // Load events from current simulation
             if (this.currentSimulation?.events) {
-                EventStorage.setEventsData(this.currentSimulation.events);
+                TimelineEditor.loadEvents(this.currentSimulation.events);
             }
         }
 
@@ -375,7 +372,7 @@ const AdminPanel = {
             pricing: AdminPricing.getPricesData(),
             supply: {},
             demand: {},
-            events: window.EventStorage ? EventStorage.getEventsData() : [],
+            events: window.TimelineEditor ? TimelineEditor.getEventsForSave() : [],
             settings: {
                 startingFunds: parseFloat(document.getElementById('startingFunds')?.value) || 200000,
                 locLimit: parseFloat(document.getElementById('locLimit')?.value) || 200000,
@@ -547,11 +544,17 @@ const AdminPanel = {
             let eventsHtml = '';
             simData.events.forEach(e => {
                 const startMonth = Math.ceil(e.startPeriod / 2);
+                const endMonth = Math.ceil(e.endPeriod / 2);
                 const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                const monthName = months[startMonth] || `M${startMonth}`;
-                const typeLabel = e.type === 'news' ? '📰' : '⚡';
-                const affectsCount = e.affects?.length || 0;
-                eventsHtml += `<li>${typeLabel} "${e.name}" (${monthName}) - ${affectsCount} effect${affectsCount !== 1 ? 's' : ''}</li>`;
+                const startName = months[startMonth] || `M${startMonth}`;
+                const endName = months[endMonth] || `M${endMonth}`;
+                const period = startMonth === endMonth ? startName : `${startName}-${endName}`;
+                const trackCount = e.tracks ? Object.keys(e.tracks).length : 0;
+                const trackIcons = e.tracks ? Object.keys(e.tracks).map(t => {
+                    const icons = { price: '💵', supply: '📦', demand: '🏭', logistics: '🚢', financial: '🏦', news: '📰' };
+                    return icons[t] || '📌';
+                }).join('') : '';
+                eventsHtml += `<li>${trackIcons} "${e.name}" (${period}) - ${trackCount} track${trackCount !== 1 ? 's' : ''}</li>`;
             });
             eventsList.innerHTML = eventsHtml;
         }

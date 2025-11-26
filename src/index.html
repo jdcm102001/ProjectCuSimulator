@@ -10,7 +10,7 @@
 
     <!-- Admin Panel CSS -->
     <link rel="stylesheet" href="css/admin-panel.css">
-    <link rel="stylesheet" href="css/event-builder.css">
+    <link rel="stylesheet" href="css/timeline-editor.css">
 
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
@@ -234,144 +234,278 @@
                 </div>
             </div>
 
-            <!-- EVENTS TAB - NEW EVENT BUILDER -->
+            <!-- EVENTS TAB - TIMELINE EDITOR -->
             <div class="tab-content" id="tab-events">
-                <div class="event-builder" id="eventBuilder">
+                <div class="timeline-editor" id="timelineEditor">
 
-                  <!-- TOP ROW: Block Palette + Workspace -->
-                  <div class="builder-top-row">
+                  <!-- TOP TOOLBAR -->
+                  <div class="timeline-toolbar">
+                    <div class="toolbar-left">
+                      <button class="toolbar-btn" id="undoBtn" onclick="TimelineEditor.undo()" title="Undo (Ctrl+Z)" disabled>
+                        ↶ Undo
+                      </button>
+                      <div class="toolbar-divider"></div>
+                      <button class="toolbar-btn" onclick="TimelineEditor.zoomIn()" title="Zoom In">
+                        🔍+
+                      </button>
+                      <button class="toolbar-btn" onclick="TimelineEditor.zoomOut()" title="Zoom Out">
+                        🔍−
+                      </button>
+                      <button class="toolbar-btn" onclick="TimelineEditor.zoomFit()" title="Fit All">
+                        ⊡
+                      </button>
+                      <span class="zoom-level" id="zoomLevel">100%</span>
+                    </div>
+                    <div class="toolbar-center">
+                      <span class="toolbar-title">Event Timeline</span>
+                    </div>
+                    <div class="toolbar-right">
+                      <button class="toolbar-btn" onclick="TimelineEditor.validateEvents()">
+                        ✓ Validate
+                      </button>
+                      <button class="toolbar-btn primary" onclick="TimelineEditor.openGraphsPanel()">
+                        📊 View Graphs
+                      </button>
+                    </div>
+                  </div>
 
-                    <!-- BLOCK PALETTE (Left Side) -->
-                    <div class="block-palette" id="blockPalette">
-                      <h4>Blocks</h4>
+                  <!-- MAIN TIMELINE AREA -->
+                  <div class="timeline-main">
 
-                      <div class="palette-section">
-                        <div class="palette-label">Events</div>
-
-                        <div class="palette-block" draggable="true" data-block-type="news">
-                          <div class="block-icon">📰</div>
-                          <div class="block-name">News</div>
-                          <div class="block-desc">Foreshadowing</div>
-                        </div>
-
-                        <div class="palette-block" draggable="true" data-block-type="event">
-                          <div class="block-icon">📦</div>
-                          <div class="block-name">Event</div>
-                          <div class="block-desc">Main event</div>
-                        </div>
-                      </div>
-
-                      <div class="palette-section">
-                        <div class="palette-label">Quick Add</div>
-                        <p class="palette-hint">Click any graph line to add an effect</p>
-                      </div>
+                    <!-- EVENT PALETTE (Left sidebar) -->
+                    <div class="timeline-palette" id="timelinePalette">
+                      <h4>Events</h4>
 
                       <div class="palette-section">
                         <div class="palette-label">Templates</div>
 
-                        <div class="palette-block template" draggable="true" data-template="mine-strike">
-                          <div class="block-icon">⛏️</div>
-                          <div class="block-name">Mine Strike</div>
+                        <div class="palette-item" draggable="true" data-template="mine-strike">
+                          <span class="palette-icon">⛏️</span>
+                          <span class="palette-name">Mine Strike</span>
                         </div>
 
-                        <div class="palette-block template" draggable="true" data-template="stimulus">
-                          <div class="block-icon">💰</div>
-                          <div class="block-name">Stimulus</div>
+                        <div class="palette-item" draggable="true" data-template="stimulus">
+                          <span class="palette-icon">💰</span>
+                          <span class="palette-name">Stimulus</span>
                         </div>
 
-                        <div class="palette-block template" draggable="true" data-template="rate-hike">
-                          <div class="block-icon">🏦</div>
-                          <div class="block-name">Rate Hike</div>
+                        <div class="palette-item" draggable="true" data-template="rate-hike">
+                          <span class="palette-icon">🏦</span>
+                          <span class="palette-name">Rate Hike</span>
                         </div>
 
-                        <div class="palette-block template" draggable="true" data-template="port-strike">
-                          <div class="block-icon">🚢</div>
-                          <div class="block-name">Port Strike</div>
+                        <div class="palette-item" draggable="true" data-template="port-strike">
+                          <span class="palette-icon">🚢</span>
+                          <span class="palette-name">Port Strike</span>
                         </div>
+
+                        <div class="palette-item" draggable="true" data-template="demand-surge">
+                          <span class="palette-icon">📈</span>
+                          <span class="palette-name">Demand Surge</span>
+                        </div>
+                      </div>
+
+                      <div class="palette-section">
+                        <div class="palette-label">Custom</div>
+
+                        <div class="palette-item" draggable="true" data-type="price">
+                          <span class="palette-icon">💵</span>
+                          <span class="palette-name">Price Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="supply">
+                          <span class="palette-icon">📦</span>
+                          <span class="palette-name">Supply Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="demand">
+                          <span class="palette-icon">🏭</span>
+                          <span class="palette-name">Demand Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="logistics">
+                          <span class="palette-icon">🚢</span>
+                          <span class="palette-name">Logistics Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="financial">
+                          <span class="palette-icon">🏦</span>
+                          <span class="palette-name">Financial Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="news">
+                          <span class="palette-icon">📰</span>
+                          <span class="palette-name">News Item</span>
+                        </div>
+                      </div>
+
+                      <div class="palette-hint">
+                        Drag to timeline or double-click track to create
                       </div>
                     </div>
 
-                    <!-- WORKSPACE (Right Side) -->
-                    <div class="block-workspace" id="blockWorkspace">
-                      <div class="workspace-header">
-                        <h4>Event Workspace</h4>
-                        <div class="workspace-actions">
-                          <button class="btn-small" onclick="EventBuilder.clearWorkspace()">Clear All</button>
-                          <button class="btn-small" onclick="EventBuilder.validateEvents()">Validate</button>
+                    <!-- TIMELINE TRACKS -->
+                    <div class="timeline-container" id="timelineContainer">
+
+                      <!-- TIME HEADER (Fixed at top) -->
+                      <div class="timeline-header" id="timelineHeader">
+                        <div class="track-label-spacer"></div>
+                        <div class="time-markers" id="timeMarkers">
+                          <!-- Generated dynamically -->
                         </div>
                       </div>
 
-                      <div class="workspace-area" id="workspaceArea">
-                        <div class="workspace-placeholder">
-                          Drag blocks here to create events
+                      <!-- SCROLLABLE TRACKS AREA -->
+                      <div class="timeline-tracks-wrapper" id="timelineTracksWrapper">
+                        <div class="timeline-tracks" id="timelineTracks">
+
+                          <!-- TRACK: PRICE -->
+                          <div class="timeline-track" data-track="price">
+                            <div class="track-label">
+                              <span class="track-icon">💵</span>
+                              <span class="track-name">Price</span>
+                            </div>
+                            <div class="track-content" data-track="price">
+                              <!-- Event bars rendered here -->
+                            </div>
+                          </div>
+
+                          <!-- TRACK: SUPPLY -->
+                          <div class="timeline-track" data-track="supply">
+                            <div class="track-label">
+                              <span class="track-icon">📦</span>
+                              <span class="track-name">Supply</span>
+                            </div>
+                            <div class="track-content" data-track="supply">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: DEMAND -->
+                          <div class="timeline-track" data-track="demand">
+                            <div class="track-label">
+                              <span class="track-icon">🏭</span>
+                              <span class="track-name">Demand</span>
+                            </div>
+                            <div class="track-content" data-track="demand">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: LOGISTICS -->
+                          <div class="timeline-track" data-track="logistics">
+                            <div class="track-label">
+                              <span class="track-icon">🚢</span>
+                              <span class="track-name">Logistics</span>
+                            </div>
+                            <div class="track-content" data-track="logistics">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: FINANCIAL -->
+                          <div class="timeline-track" data-track="financial">
+                            <div class="track-label">
+                              <span class="track-icon">🏦</span>
+                              <span class="track-name">Financial</span>
+                            </div>
+                            <div class="track-content" data-track="financial">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: NEWS -->
+                          <div class="timeline-track" data-track="news">
+                            <div class="track-label">
+                              <span class="track-icon">📰</span>
+                              <span class="track-name">News</span>
+                            </div>
+                            <div class="track-content" data-track="news">
+                            </div>
+                          </div>
+
                         </div>
                       </div>
+
                     </div>
 
                   </div>
 
-                  <!-- BOTTOM ROW: Live Graphs -->
-                  <div class="builder-bottom-row">
-                    <div class="graphs-header">
-                      <h4>Live Preview</h4>
-                      <div class="graph-legend">
-                        <span class="legend-item baseline">Baseline</span>
-                        <span class="legend-item effective">With Events</span>
+                  <!-- PROPERTIES PANEL (Slides in when event selected) -->
+                  <div class="properties-panel" id="propertiesPanel">
+                    <div class="properties-header">
+                      <span class="properties-title" id="propertiesTitle">Event Properties</span>
+                      <button class="properties-close" onclick="TimelineEditor.closeProperties()">×</button>
+                    </div>
+                    <div class="properties-body" id="propertiesBody">
+                      <!-- Dynamically populated based on selected event -->
+                    </div>
+                    <div class="properties-footer">
+                      <button class="btn-danger" onclick="TimelineEditor.deleteSelectedEvent()">Delete Event</button>
+                    </div>
+                  </div>
+
+                  <!-- GRAPHS PANEL (Collapsible side panel) -->
+                  <div class="graphs-panel" id="graphsPanel">
+                    <div class="graphs-panel-header">
+                      <span>📊 Live Preview</span>
+                      <button class="graphs-panel-close" onclick="TimelineEditor.closeGraphsPanel()">×</button>
+                    </div>
+                    <div class="graphs-panel-body">
+                      <div class="graph-mini" id="graphMiniPrice">
+                        <div class="graph-mini-title">Prices</div>
+                        <canvas id="canvasMiniPrice" width="250" height="100"></canvas>
+                      </div>
+                      <div class="graph-mini" id="graphMiniSupply">
+                        <div class="graph-mini-title">Supply & Demand</div>
+                        <canvas id="canvasMiniSupply" width="250" height="100"></canvas>
+                      </div>
+                      <div class="graph-mini" id="graphMiniLogistics">
+                        <div class="graph-mini-title">Shipping</div>
+                        <canvas id="canvasMiniLogistics" width="250" height="100"></canvas>
+                      </div>
+                      <div class="graph-mini" id="graphMiniFinancial">
+                        <div class="graph-mini-title">Financial</div>
+                        <canvas id="canvasMiniFinancial" width="250" height="100"></canvas>
                       </div>
                     </div>
+                  </div>
 
-                    <div class="graphs-container" id="graphsContainer">
-
-                      <!-- GRAPH 1: Prices (LME + COMEX) -->
-                      <div class="graph-panel" data-graph="prices">
-                        <div class="graph-title">
-                          <span class="graph-icon">💵</span> Prices
-                          <span class="graph-lines">
-                            <span class="line-indicator lme">LME</span>
-                            <span class="line-indicator comex">COMEX</span>
-                          </span>
-                        </div>
-                        <canvas id="graphPrices" width="400" height="200"></canvas>
+                  <!-- NAME PROMPT MODAL -->
+                  <div class="name-modal" id="nameModal">
+                    <div class="name-modal-content">
+                      <h3>Name Your Event</h3>
+                      <input type="text" id="eventNameInput" placeholder="e.g., Mine Strike, China Stimulus...">
+                      <div class="name-modal-actions">
+                        <button class="btn-secondary" onclick="TimelineEditor.cancelNamePrompt()">Cancel</button>
+                        <button class="btn-primary" onclick="TimelineEditor.confirmNamePrompt()">Create</button>
                       </div>
+                    </div>
+                  </div>
 
-                      <!-- GRAPH 2: Supply & Demand -->
-                      <div class="graph-panel" data-graph="supplyDemand">
-                        <div class="graph-title">
-                          <span class="graph-icon">📦</span> Supply & Demand
-                          <span class="graph-lines">
-                            <span class="line-indicator callao">Callao</span>
-                            <span class="line-indicator antof">Antof</span>
-                            <span class="line-indicator americas">Amer</span>
-                            <span class="line-indicator asia">Asia</span>
-                            <span class="line-indicator europe">Eur</span>
-                          </span>
-                        </div>
-                        <canvas id="graphSupplyDemand" width="400" height="200"></canvas>
-                      </div>
-
-                      <!-- GRAPH 3: Shipping -->
-                      <div class="graph-panel" data-graph="shipping">
-                        <div class="graph-title">
-                          <span class="graph-icon">🚢</span> Shipping Rates
-                          <span class="graph-lines">
-                            <span class="line-indicator fob">FOB</span>
-                            <span class="line-indicator cif">CIF</span>
-                          </span>
-                        </div>
-                        <canvas id="graphShipping" width="400" height="200"></canvas>
-                      </div>
-
-                      <!-- GRAPH 4: Financial -->
-                      <div class="graph-panel" data-graph="financial">
-                        <div class="graph-title">
-                          <span class="graph-icon">🏦</span> Financial
-                          <span class="graph-lines">
-                            <span class="line-indicator interest">Interest %</span>
-                          </span>
-                        </div>
-                        <canvas id="graphFinancial" width="400" height="200"></canvas>
-                      </div>
-
+                  <!-- CONTEXT MENU -->
+                  <div class="context-menu" id="contextMenu">
+                    <div class="context-menu-item" onclick="TimelineEditor.editSelectedEvent()">
+                      <span>✏️</span> Edit
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.duplicateSelectedEvent()">
+                      <span>📋</span> Duplicate
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('price')">
+                      <span>💵</span> Add Price Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('supply')">
+                      <span>📦</span> Add Supply Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('demand')">
+                      <span>🏭</span> Add Demand Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('logistics')">
+                      <span>🚢</span> Add Logistics Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('financial')">
+                      <span>🏦</span> Add Financial Effect
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item danger" onclick="TimelineEditor.deleteSelectedEvent()">
+                      <span>🗑️</span> Delete
                     </div>
                   </div>
 
@@ -1077,9 +1211,8 @@
     <script src="js/admin/admin-pricing.js?v=2"></script>
     <script src="js/admin/admin-events.js?v=2"></script>
     <!-- New Event Builder System -->
-    <script src="js/admin/event-storage.js?v=1"></script>
-    <script src="js/admin/multi-graph.js?v=1"></script>
-    <script src="js/admin/event-builder.js?v=1"></script>
+    <script src="js/admin/timeline-graphs.js?v=1"></script>
+    <script src="js/admin/timeline-editor.js?v=1"></script>
     <script src="js/admin/admin-panel.js?v=2"></script>
 </body>
 </html>
