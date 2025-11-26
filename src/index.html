@@ -8,6 +8,9 @@
     <!-- Single CSS file -->
     <link rel="stylesheet" href="css/style.css">
 
+    <!-- Admin Panel CSS -->
+    <link rel="stylesheet" href="css/admin-panel.css">
+
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
@@ -24,6 +27,522 @@
     <script src="data/june.js"></script>
 </head>
 <body>
+    <!-- ============================================================
+         ADMIN LOGIN SCREEN
+         ============================================================ -->
+    <div class="admin-login" id="adminLogin" style="display: none;">
+        <div class="admin-login-box">
+            <h2>Admin Access</h2>
+            <input type="password" id="adminPassword" placeholder="Enter password">
+            <button id="adminLoginBtn">LOGIN</button>
+            <div class="admin-error" id="adminError" style="display:none;">
+                Incorrect password
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         SCENARIO SELECTION SCREEN
+         ============================================================ -->
+    <div class="scenario-selection" id="scenarioSelection" style="display: none;">
+        <div class="scenario-selection-box">
+            <h2>Select Simulation</h2>
+            <div id="scenarioList">
+                <!-- Populated by JavaScript -->
+            </div>
+            <div class="scenario-selection-footer">
+                <button id="openAdminBtn">OPEN ADMIN PANEL</button>
+                <button id="startGameBtn">START GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         ADMIN PANEL (Full Screen Overlay)
+         ============================================================ -->
+    <div class="admin-panel" id="adminPanel" style="display: none;">
+        <div class="admin-header">
+            <h1>Admin Panel - Simulation Builder</h1>
+            <button class="admin-close" id="adminClose">X</button>
+        </div>
+
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-tab="pricing">PRICING</button>
+            <button class="admin-tab" data-tab="supply">SUPPLY</button>
+            <button class="admin-tab" data-tab="demand">DEMAND</button>
+            <button class="admin-tab" data-tab="events">EVENTS</button>
+            <button class="admin-tab" data-tab="settings">SETTINGS</button>
+            <button class="admin-tab" data-tab="preview">PREVIEW</button>
+        </div>
+
+        <div class="admin-content">
+            <!-- PRICING TAB -->
+            <div class="tab-content active" id="tab-pricing">
+                <h2>Spot Price Configuration</h2>
+                <p class="tab-description">
+                    Drag points on the graph to set monthly average spot prices.
+                    Early/Late prices can be fine-tuned in the fields below.
+                </p>
+
+                <div class="price-graph-container">
+                    <canvas id="priceGraph" width="900" height="350"></canvas>
+                </div>
+
+                <div class="price-legend">
+                    <span class="legend-item lme">&#9679; LME Spot</span>
+                    <span class="legend-item comex">&#9679; COMEX Spot</span>
+                </div>
+
+                <div class="price-fields">
+                    <div class="month-prices" data-month="1">
+                        <h4>JANUARY</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="8960">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="8960">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="8960">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="9344">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="9344">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="9344">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="2">
+                        <h4>FEBRUARY</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9117">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9100">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9134">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10229">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10200">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10258">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="3">
+                        <h4>MARCH</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9075">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9050">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9100">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10187">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10150">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10224">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="4">
+                        <h4>APRIL</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9138">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9120">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9156">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10210">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10180">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10240">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="5">
+                        <h4>MAY</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9200">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9180">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9220">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10300">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10270">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10330">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="6">
+                        <h4>JUNE</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9280">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9260">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9300">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10380">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10350">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10410">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUPPLY TAB -->
+            <div class="tab-content" id="tab-supply">
+                <h2>Supply Configuration</h2>
+                <p class="tab-description">
+                    Configure one supplier per month. Select supplier and customize tonnage, premium, and exchange.
+                </p>
+                <div class="config-grid" id="supplyConfig">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- DEMAND TAB -->
+            <div class="tab-content" id="tab-demand">
+                <h2>Demand Configuration</h2>
+                <p class="tab-description">
+                    Configure one buyer per month. Exchange and port are determined by the buyer's region.
+                </p>
+                <div class="config-grid" id="demandConfig">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- EVENTS TAB -->
+            <div class="tab-content" id="tab-events">
+                <h2>Events Timeline</h2>
+                <p class="tab-description">
+                    Create market events that affect prices. Click "+ ADD EVENT" to create, click events to edit, right-click to delete.
+                </p>
+
+                <div class="events-container">
+                    <div class="gantt-chart">
+                        <div class="gantt-header">
+                            <div class="gantt-header-cell event-name">Event</div>
+                            <div class="gantt-header-cell">Jan-E</div>
+                            <div class="gantt-header-cell">Jan-L</div>
+                            <div class="gantt-header-cell">Feb-E</div>
+                            <div class="gantt-header-cell">Feb-L</div>
+                            <div class="gantt-header-cell">Mar-E</div>
+                            <div class="gantt-header-cell">Mar-L</div>
+                            <div class="gantt-header-cell">Apr-E</div>
+                            <div class="gantt-header-cell">Apr-L</div>
+                            <div class="gantt-header-cell">May-E</div>
+                            <div class="gantt-header-cell">May-L</div>
+                            <div class="gantt-header-cell">Jun-E</div>
+                            <div class="gantt-header-cell">Jun-L</div>
+                        </div>
+                        <div class="gantt-body" id="ganttBody">
+                            <div class="gantt-empty">No events configured. Click "+ ADD EVENT" to create one.</div>
+                        </div>
+                    </div>
+
+                    <button class="add-event-btn" id="addEventBtn">+ ADD EVENT</button>
+
+                    <div class="events-legend">
+                        <span>&#x1F7E2; Green = Bullish (prices up)</span>
+                        <span>&#x1F534; Red = Bearish (prices down)</span>
+                        <span>&#x26AA; Gray = Neutral (informational)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div class="tab-content" id="tab-settings">
+                <h2>Simulation Settings</h2>
+
+                <div class="settings-section">
+                    <h3>Simulation Info</h3>
+                    <div class="settings-row">
+                        <label>Name:</label>
+                        <input type="text" id="simName" value="Custom Simulation" maxlength="50">
+                    </div>
+                    <div class="settings-row">
+                        <label>Description:</label>
+                        <textarea id="simDescription" rows="3" maxlength="300">A custom trading simulation scenario.</textarea>
+                    </div>
+                    <div class="settings-row">
+                        <label>Difficulty:</label>
+                        <select id="simDifficulty">
+                            <option value="Easy">Easy</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="Hard">Hard</option>
+                            <option value="Custom">Custom</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Financial Settings</h3>
+                    <div class="settings-row">
+                        <label>Starting Practice Funds:</label>
+                        <input type="number" id="startingFunds" value="200000" min="10000" max="10000000">
+                        <span class="unit">$</span>
+                    </div>
+                    <div class="settings-row">
+                        <label>LOC Limit:</label>
+                        <input type="number" id="locLimit" value="200000" min="0" max="10000000">
+                        <span class="unit">$</span>
+                    </div>
+                    <div class="settings-row">
+                        <label>Annual Interest Rate (SOFR):</label>
+                        <input type="number" id="interestRate" value="4.32" min="0" max="20" step="0.01">
+                        <span class="unit">%</span>
+                    </div>
+                    <div class="settings-row">
+                        <label>Margin Requirement:</label>
+                        <input type="number" id="marginRequirement" value="100000" min="0" max="10000000">
+                        <span class="unit">$</span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Game Settings</h3>
+                    <div class="settings-row">
+                        <label>Timer per Period:</label>
+                        <input type="number" id="timerMinutes" value="10" min="1" max="60">
+                        <span class="unit">minutes</span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Admin Settings</h3>
+                    <div class="settings-row">
+                        <label>Change Password:</label>
+                        <div class="password-change-row">
+                            <input type="password" id="currentPassword" placeholder="Current">
+                            <input type="password" id="newPassword" placeholder="New">
+                            <input type="password" id="confirmPassword" placeholder="Confirm">
+                            <button id="updatePasswordBtn">UPDATE</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PREVIEW TAB -->
+            <div class="tab-content" id="tab-preview">
+                <h2>Simulation Preview</h2>
+                <p class="tab-description">
+                    Review all settings before saving. Fix any errors shown below.
+                </p>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4CB;</span> Simulation Info</h3>
+                    <div class="preview-row">
+                        <span class="label">Name:</span>
+                        <span class="value" id="previewName">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">Description:</span>
+                        <span class="value" id="previewDescription">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">Difficulty:</span>
+                        <span class="value" id="previewDifficulty">-</span>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4C8;</span> Pricing Summary</h3>
+                    <div class="preview-mini-graph" id="previewPriceGraph"></div>
+                    <div class="preview-row">
+                        <span class="label">LME Range:</span>
+                        <span class="value" id="previewLmeRange">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">COMEX Range:</span>
+                        <span class="value" id="previewComexRange">-</span>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4E6;</span> Supply by Month</h3>
+                    <ul class="preview-list" id="previewSupplyList"></ul>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F3ED;</span> Demand by Month</h3>
+                    <ul class="preview-list" id="previewDemandList"></ul>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F3AD;</span> Events (<span id="previewEventsCount">0</span> total)</h3>
+                    <ul class="preview-list" id="previewEventsList"></ul>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4B0;</span> Financial Settings</h3>
+                    <div class="preview-row">
+                        <span class="label">Starting Funds:</span>
+                        <span class="value" id="previewFunds">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">LOC Limit:</span>
+                        <span class="value" id="previewLoc">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">Interest Rate:</span>
+                        <span class="value" id="previewInterest">-</span>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x26A0;</span> Validation</h3>
+                    <div class="validation-results" id="validationResults">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-footer">
+            <div class="save-controls">
+                <label>Save to:</label>
+                <select id="saveSlotSelect">
+                    <option value="1">Slot 1</option>
+                    <option value="2">Slot 2</option>
+                    <option value="3">Slot 3</option>
+                </select>
+                <button id="saveSimBtn">SAVE</button>
+                <button id="resetDefaultsBtn">RESET TO DEFAULTS</button>
+                <button id="deleteSimBtn">DELETE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         EVENT CREATION/EDIT MODAL
+         ============================================================ -->
+    <div class="event-modal" id="eventModal" style="display: none;">
+        <div class="event-modal-content">
+            <h3 id="eventModalTitle">Create Event</h3>
+
+            <div class="event-form-group">
+                <label>Event Name:</label>
+                <input type="text" id="eventName" placeholder="e.g., China Stimulus Package" maxlength="40">
+            </div>
+
+            <div class="event-form-group">
+                <label>Event Type:</label>
+                <select id="eventType">
+                    <option value="supply">Supply (affects available tonnage)</option>
+                    <option value="demand">Demand (affects buyer requirements)</option>
+                    <option value="price" selected>Price (affects spot prices)</option>
+                    <option value="logistics">Logistics (affects freight/travel)</option>
+                    <option value="financial">Financial (affects interest/LOC)</option>
+                    <option value="news">News (informational only)</option>
+                </select>
+            </div>
+
+            <div class="event-form-group">
+                <label>Description:</label>
+                <textarea id="eventDescription" placeholder="Brief description of the event..." maxlength="200"></textarea>
+            </div>
+
+            <div class="event-form-group">
+                <label>Start Period:</label>
+                <select id="eventStartPeriod">
+                    <option value="1">Jan-Early</option>
+                    <option value="2">Jan-Late</option>
+                    <option value="3">Feb-Early</option>
+                    <option value="4">Feb-Late</option>
+                    <option value="5">Mar-Early</option>
+                    <option value="6">Mar-Late</option>
+                    <option value="7">Apr-Early</option>
+                    <option value="8">Apr-Late</option>
+                    <option value="9">May-Early</option>
+                    <option value="10">May-Late</option>
+                    <option value="11">Jun-Early</option>
+                    <option value="12">Jun-Late</option>
+                </select>
+            </div>
+
+            <div class="event-form-group">
+                <label>End Period:</label>
+                <select id="eventEndPeriod">
+                    <option value="1">Jan-Early</option>
+                    <option value="2">Jan-Late</option>
+                    <option value="3">Feb-Early</option>
+                    <option value="4" selected>Feb-Late</option>
+                    <option value="5">Mar-Early</option>
+                    <option value="6">Mar-Late</option>
+                    <option value="7">Apr-Early</option>
+                    <option value="8">Apr-Late</option>
+                    <option value="9">May-Early</option>
+                    <option value="10">May-Late</option>
+                    <option value="11">Jun-Early</option>
+                    <option value="12">Jun-Late</option>
+                </select>
+            </div>
+
+            <div class="event-form-group">
+                <label>Market Sentiment:</label>
+                <div class="sentiment-options">
+                    <label class="sentiment-option bullish">
+                        <input type="radio" name="eventSentiment" value="bullish" checked>
+                        Bullish (prices up)
+                    </label>
+                    <label class="sentiment-option bearish">
+                        <input type="radio" name="eventSentiment" value="bearish">
+                        Bearish (prices down)
+                    </label>
+                    <label class="sentiment-option neutral">
+                        <input type="radio" name="eventSentiment" value="neutral">
+                        Neutral
+                    </label>
+                </div>
+            </div>
+
+            <div class="event-form-group">
+                <label>Severity:</label>
+                <select id="eventSeverity">
+                    <option value="minor">Minor (5% impact)</option>
+                    <option value="medium" selected>Medium (10% impact)</option>
+                    <option value="high">High (15% impact)</option>
+                    <option value="significant">Significant (25% impact)</option>
+                </select>
+            </div>
+
+            <div class="event-impacts">
+                <h4>Calculated Price Impacts (during event):</h4>
+                <div id="eventImpactsPreview">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="event-modal-actions">
+                <button class="event-save-btn" id="eventSaveBtn">SAVE EVENT</button>
+                <button class="event-delete-btn" id="eventDeleteBtn" style="display: none;">DELETE</button>
+                <button class="event-cancel-btn" id="eventCancelBtn">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
     <!-- HEADER BAR (Fixed, Static) -->
     <header id="header">
         <div class="metric">
@@ -420,5 +939,11 @@
 
     <!-- Enhanced Debug Panel (Development Only) -->
     <script src="js/debug/debug-panel.js?v=5"></script>
+
+    <!-- Admin Panel Scripts -->
+    <script src="js/admin/admin-storage.js?v=1"></script>
+    <script src="js/admin/admin-pricing.js?v=1"></script>
+    <script src="js/admin/admin-events.js?v=1"></script>
+    <script src="js/admin/admin-panel.js?v=1"></script>
 </body>
 </html>
