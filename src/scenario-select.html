@@ -416,11 +416,14 @@
         function startGame() {
             if (selectedSlot === null) return;
 
-            // Save selection and redirect to game
+            // Save selection to localStorage as backup
             ScenarioLoader.selectScenario(selectedSlot);
 
-            // Redirect to game page (debug.html contains the actual game)
-            window.location.href = 'debug.html';
+            // Redirect to game page with scenario URL parameter
+            // This ensures the correct scenario loads even on page refresh
+            const scenarioParam = selectedSlot === 0 ? 'default' : `slot_${selectedSlot}`;
+            console.log('[ScenarioSelect] Starting game with scenario:', scenarioParam);
+            window.location.href = `debug.html?scenario=${scenarioParam}`;
         }
 
         /**

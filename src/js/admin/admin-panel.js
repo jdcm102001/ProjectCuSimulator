@@ -589,18 +589,39 @@ const AdminPanel = {
      * Load a simulation into the admin panel
      */
     loadSimulationIntoPanel(slotNumber) {
+        console.log('[AdminPanel] Loading simulation from slot:', slotNumber);
+
         const sim = AdminStorage.loadSimulation(slotNumber);
         if (!sim) {
             alert(`No simulation found in Slot ${slotNumber}`);
             return;
         }
 
+        console.log('[AdminPanel] Loaded data:', sim);
+        console.log('[AdminPanel] Metadata:', sim.metadata);
+        console.log('[AdminPanel] Pricing LME month 1:', sim.pricing?.lme?.[1]);
+        console.log('[AdminPanel] Supply month 1:', sim.supply?.[1]);
+        console.log('[AdminPanel] Demand month 1:', sim.demand?.[1]);
+        console.log('[AdminPanel] Settings:', sim.settings);
+        console.log('[AdminPanel] Events count:', sim.events?.length || 0);
+
         this.currentSimulation = sim;
+
+        // Re-initialize all modules with new data
+        console.log('[AdminPanel] Calling initializeModules()...');
         this.initializeModules();
+
         this.selectedSlot = slotNumber === 0 ? 1 : slotNumber;
         document.getElementById('saveSlotSelect').value = this.selectedSlot;
 
-        alert(`Loaded simulation from Slot ${slotNumber}`);
+        // Verify forms were populated
+        console.log('[AdminPanel] Verifying form population...');
+        console.log('[AdminPanel] simName value:', document.getElementById('simName')?.value);
+        console.log('[AdminPanel] startingFunds value:', document.getElementById('startingFunds')?.value);
+        console.log('[AdminPanel] Supply selector month 1:', document.querySelector('.supply-supplier[data-month="1"]')?.value);
+        console.log('[AdminPanel] Demand selector month 1:', document.querySelector('.demand-buyer[data-month="1"]')?.value);
+
+        alert(`Loaded "${sim.metadata?.name || 'Unnamed'}" from Slot ${slotNumber}`);
     }
 };
 

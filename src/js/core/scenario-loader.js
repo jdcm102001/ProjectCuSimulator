@@ -43,10 +43,36 @@ const ScenarioLoader = {
     transformedMonthData: [],
 
     /**
-     * Initialize the loader
+     * Initialize the loader - check URL params first, then localStorage
      */
     init() {
         console.log('[ScenarioLoader] Initializing...');
+
+        // Check URL for scenario parameter first (takes priority)
+        const params = new URLSearchParams(window.location.search);
+        const scenarioParam = params.get('scenario');
+
+        console.log('[ScenarioLoader] URL scenario param:', scenarioParam);
+
+        if (scenarioParam) {
+            if (scenarioParam === 'default' || scenarioParam === '0') {
+                console.log('[ScenarioLoader] URL specifies default scenario');
+                this.selectScenario(0);
+            } else if (scenarioParam.startsWith('slot_')) {
+                const slotNum = parseInt(scenarioParam.replace('slot_', ''), 10);
+                console.log('[ScenarioLoader] URL specifies slot:', slotNum);
+                this.selectScenario(slotNum);
+            } else {
+                // Try parsing as number
+                const slotNum = parseInt(scenarioParam, 10);
+                if (!isNaN(slotNum)) {
+                    console.log('[ScenarioLoader] URL specifies slot number:', slotNum);
+                    this.selectScenario(slotNum);
+                }
+            }
+        }
+
+        console.log('[ScenarioLoader] Using slot:', this.getSelectedSlot());
     },
 
     /**
@@ -58,9 +84,25 @@ const ScenarioLoader = {
     },
 
     /**
-     * Get currently selected scenario slot
+     * Get currently selected scenario slot - check URL first, then localStorage
      */
     getSelectedSlot() {
+        // Check URL params first
+        const params = new URLSearchParams(window.location.search);
+        const scenarioParam = params.get('scenario');
+
+        if (scenarioParam) {
+            if (scenarioParam === 'default' || scenarioParam === '0') {
+                return 0;
+            } else if (scenarioParam.startsWith('slot_')) {
+                return parseInt(scenarioParam.replace('slot_', ''), 10);
+            } else {
+                const num = parseInt(scenarioParam, 10);
+                if (!isNaN(num)) return num;
+            }
+        }
+
+        // Fall back to localStorage
         const slot = localStorage.getItem(this.SELECTED_SLOT_KEY);
         return slot !== null ? parseInt(slot, 10) : 0;
     },
@@ -156,23 +198,41 @@ const ScenarioLoader = {
      */
     loadSelectedScenario() {
         const slot = this.getSelectedSlot();
+        console.log('[ScenarioLoader] ═══════════════════════════════════════');
         console.log('[ScenarioLoader] Loading selected scenario from slot:', slot);
 
         const scenario = this.loadScenarioFromSlot(slot);
 
         if (!scenario) {
             // Use default data files
-            console.log('[ScenarioLoader] Using default data files');
+            console.log('[ScenarioLoader] Using DEFAULT data files (slot 0 or empty slot)');
+            console.log('[ScenarioLoader] Checking default data availability:');
+            console.log('[ScenarioLoader]   JANUARY_DATA:', !!window.JANUARY_DATA);
+            console.log('[ScenarioLoader]   FEBRUARY_DATA:', !!window.FEBRUARY_DATA);
             this.loadedScenario = null;
             this.transformedMonthData = [];
             return false;
         }
 
+        // Log the loaded scenario details
+        console.log('[ScenarioLoader] ✓ CUSTOM scenario loaded:');
+        console.log('[ScenarioLoader]   Name:', scenario.metadata?.name);
+        console.log('[ScenarioLoader]   LME Month 1:', scenario.pricing?.lme?.[1]?.average);
+        console.log('[ScenarioLoader]   Supply Month 1:', scenario.supply?.[1]?.supplier, scenario.supply?.[1]?.maxMT, 'MT');
+        console.log('[ScenarioLoader]   Demand Month 1:', scenario.demand?.[1]?.buyer, scenario.demand?.[1]?.maxMT, 'MT');
+        console.log('[ScenarioLoader]   Events:', scenario.events?.length || 0);
+
         // Transform and store
         this.loadedScenario = scenario;
         this.transformedMonthData = this.transformScenarioToMonthData(scenario);
 
-        console.log('[ScenarioLoader] Transformed', this.transformedMonthData.length, 'months of data');
+        console.log('[ScenarioLoader] Transformed', this.transformedMonthData.length, 'months into game format');
+        if (this.transformedMonthData[0]) {
+            console.log('[ScenarioLoader] Month 1 result preview:');
+            console.log('[ScenarioLoader]   PRICING.LME.SPOT_AVG:', this.transformedMonthData[0].PRICING?.LME?.SPOT_AVG);
+            console.log('[ScenarioLoader]   MARKET_DEPTH.SUPPLY.PERUVIAN:', this.transformedMonthData[0].MARKET_DEPTH?.SUPPLY?.PERUVIAN?.TOTAL_MAX_AVAILABLE_MT, 'MT');
+        }
+        console.log('[ScenarioLoader] ═══════════════════════════════════════');
         return true;
     },
 
