@@ -11,13 +11,16 @@
         .section { border: 1px solid #444; padding: 10px; margin: 10px 0; }
     </style>
 
-    <!-- Load data files -->
+    <!-- Load data files (for default scenarios) -->
     <script src="data/january.js"></script>
     <script src="data/february.js"></script>
     <script src="data/march.js"></script>
     <script src="data/april.js"></script>
     <script src="data/may.js"></script>
     <script src="data/june.js"></script>
+
+    <!-- ScenarioLoader - bridge between admin panel and game -->
+    <script src="js/core/scenario-loader.js"></script>
 </head>
 <body>
     <h1>DEBUG MODE - Text Only</h1>
@@ -257,33 +260,63 @@ COMEX Spot: $${data.PRICING.COMEX.SPOT_AVG}`;
 function checkDataLoad() {
     let result = '=== DATA LOAD CHECK ===\n\n';
 
-    const months = [
-        { name: 'JANUARY', data: window.JANUARY_DATA },
-        { name: 'FEBRUARY', data: window.FEBRUARY_DATA },
-        { name: 'MARCH', data: window.MARCH_DATA },
-        { name: 'APRIL', data: window.APRIL_DATA },
-        { name: 'MAY', data: window.MAY_DATA },
-        { name: 'JUNE', data: window.JUNE_DATA }
-    ];
+    // Use ScenarioLoader to load the selected scenario
+    const isCustom = ScenarioLoader.loadSelectedScenario();
+    const selectedSlot = ScenarioLoader.getSelectedSlot();
+    const metadata = ScenarioLoader.getMetadata();
 
-    months.forEach(m => {
-        if (m.data) {
-            result += `✅ ${m.name}: Loaded\n`;
-            result += `   MONTH: ${m.data.MONTH}\n`;
-            result += `   MARKET_DEPTH: ${m.data.MARKET_DEPTH ? 'YES' : 'NO'}\n`;
-            result += `   MARKET_DEPTH.SUPPLY: ${m.data.MARKET_DEPTH?.SUPPLY ? 'YES' : 'NO'}\n`;
-            result += `   PRICING: ${m.data.PRICING ? 'YES' : 'NO'}\n`;
-            result += `   PRICING.LME.SPOT_AVG: ${m.data.PRICING?.LME?.SPOT_AVG || 'MISSING'}\n`;
-            result += `   CLIENTS: ${m.data.CLIENTS ? 'YES' : 'NO'}\n`;
-            result += `   LOGISTICS: ${m.data.LOGISTICS ? 'YES' : 'NO'}\n\n`;
+    result += `SCENARIO: ${metadata.name}\n`;
+    result += `SLOT: ${selectedSlot} (${isCustom ? 'Custom' : 'Default'})\n`;
+    result += `DIFFICULTY: ${metadata.difficulty || 'Medium'}\n\n`;
+
+    // Get all month data from ScenarioLoader
+    const allMonthData = ScenarioLoader.getAllMonthData();
+    const monthNames = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE'];
+
+    allMonthData.forEach((data, index) => {
+        const name = monthNames[index];
+        if (data) {
+            result += `OK ${name}: Loaded\n`;
+            result += `   MONTH: ${data.MONTH}\n`;
+            result += `   MARKET_DEPTH: ${data.MARKET_DEPTH ? 'YES' : 'NO'}\n`;
+            result += `   MARKET_DEPTH.SUPPLY: ${data.MARKET_DEPTH?.SUPPLY ? 'YES' : 'NO'}\n`;
+            result += `   PRICING: ${data.PRICING ? 'YES' : 'NO'}\n`;
+            result += `   PRICING.LME.SPOT_AVG: ${data.PRICING?.LME?.SPOT_AVG || 'MISSING'}\n`;
+            result += `   CLIENTS: ${data.CLIENTS ? 'YES' : 'NO'}\n`;
+            result += `   LOGISTICS: ${data.LOGISTICS ? 'YES' : 'NO'}\n\n`;
 
             // Add to game data array
-            GAME.monthData.push(m.data);
+            GAME.monthData.push(data);
         } else {
-            result += `❌ ${m.name}: NOT LOADED\n\n`;
+            result += `X ${name}: NOT LOADED\n\n`;
             GAME.monthData.push(null);
         }
     });
+
+    // Show settings if custom scenario
+    if (isCustom) {
+        const settings = ScenarioLoader.getSettings();
+        result += `\n=== SCENARIO SETTINGS ===\n`;
+        result += `Starting Funds: $${settings.startingFunds?.toLocaleString() || 'N/A'}\n`;
+        result += `LOC Limit: $${settings.locLimit?.toLocaleString() || 'N/A'}\n`;
+        result += `Interest Rate: ${settings.interestRate || 'N/A'}%\n`;
+
+        // Apply settings
+        GAME.cash = settings.startingFunds || 200000;
+        GAME.locLimit = settings.locLimit || 200000;
+    }
+
+    // Show events count
+    const events = ScenarioLoader.getEvents();
+    if (events.length > 0) {
+        result += `\n=== EVENTS: ${events.length} ===\n`;
+        events.slice(0, 3).forEach(e => {
+            result += `- ${e.name || 'Unnamed'} (Period ${e.startPeriod}-${e.endPeriod})\n`;
+        });
+        if (events.length > 3) {
+            result += `... and ${events.length - 3} more\n`;
+        }
+    }
 
     document.getElementById('dataCheck').textContent = result;
 }

@@ -429,19 +429,39 @@ const GAME_STATE = {
         // Initialize TimeManager
         TimeManager.init();
 
-        // Debug: Check what global data exists
-        console.log('[GAME] window.JANUARY_DATA:', window.JANUARY_DATA);
-        console.log('[GAME] JANUARY_DATA keys:', window.JANUARY_DATA ? Object.keys(window.JANUARY_DATA) : 'undefined');
+        // Use ScenarioLoader if available, otherwise fall back to direct globals
+        if (window.ScenarioLoader) {
+            console.log('[GAME] Using ScenarioLoader');
+            const isCustom = ScenarioLoader.loadSelectedScenario();
+            const metadata = ScenarioLoader.getMetadata();
+            console.log('[GAME] Scenario:', metadata.name, '(Custom:', isCustom, ')');
 
-        // Load all month data (from global variables set by data files)
-        this.allMonthData = [
-            window.JANUARY_DATA,
-            window.FEBRUARY_DATA,
-            window.MARCH_DATA,
-            window.APRIL_DATA,
-            window.MAY_DATA,
-            window.JUNE_DATA
-        ];
+            // Load all month data from ScenarioLoader
+            this.allMonthData = ScenarioLoader.getAllMonthData();
+
+            // Apply scenario settings
+            const settings = ScenarioLoader.getSettings();
+            if (settings) {
+                this.cash = settings.startingFunds || 200000;
+                this.locLimit = settings.locLimit || 200000;
+                console.log('[GAME] Applied settings - Cash:', this.cash, 'LOC:', this.locLimit);
+            }
+        } else {
+            // Fallback: Load from global variables (default behavior)
+            console.log('[GAME] ScenarioLoader not available, using global data');
+            console.log('[GAME] window.JANUARY_DATA:', window.JANUARY_DATA);
+
+            this.allMonthData = [
+                window.JANUARY_DATA,
+                window.FEBRUARY_DATA,
+                window.MARCH_DATA,
+                window.APRIL_DATA,
+                window.MAY_DATA,
+                window.JUNE_DATA
+            ];
+        }
+
+        console.log('[GAME] Loaded', this.allMonthData.filter(Boolean).length, 'months of data');
 
         // Set current month data based on TimeManager
         this.updateCurrentMonthData();

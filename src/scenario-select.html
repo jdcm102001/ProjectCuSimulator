@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Scenario - Perseverance Trading Simulator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #f39c12, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .scenario-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scenario-card:hover {
+            transform: translateY(-4px);
+            border-color: #f39c12;
+            box-shadow: 0 8px 30px rgba(243, 156, 18, 0.2);
+        }
+
+        .scenario-card.selected {
+            border-color: #f39c12;
+            background: rgba(243, 156, 18, 0.1);
+        }
+
+        .scenario-card.empty {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .scenario-card.empty:hover {
+            transform: none;
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: none;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .slot-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .slot-badge.default {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+
+        .slot-badge.custom {
+            background: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+
+        .scenario-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .scenario-description {
+            color: #aaa;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 16px;
+            min-height: 45px;
+        }
+
+        .scenario-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .meta-item .icon {
+            font-size: 1rem;
+        }
+
+        .difficulty-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .difficulty-easy {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+
+        .difficulty-medium {
+            background: rgba(241, 196, 15, 0.2);
+            color: #f1c40f;
+        }
+
+        .difficulty-hard {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+
+        .action-buttons {
+            margin-top: 40px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(243, 156, 18, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .admin-link {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #888;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+
+        .admin-link:hover {
+            color: #f39c12;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #888;
+        }
+
+        .no-scenarios {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .scenario-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="admin-link">
+        <span>Admin Panel</span>
+        <span>&#8594;</span>
+    </a>
+
+    <h1>Perseverance Trading Simulator</h1>
+    <p class="subtitle">Select a scenario to begin your copper trading journey</p>
+
+    <div class="scenario-grid" id="scenarioGrid">
+        <div class="loading">Loading scenarios...</div>
+    </div>
+
+    <div class="action-buttons">
+        <button class="btn btn-primary" id="startBtn" disabled>
+            <span>Start Simulation</span>
+            <span>&#9654;</span>
+        </button>
+        <a href="index.html" class="btn btn-secondary">
+            <span>Create/Edit Scenarios</span>
+        </a>
+    </div>
+
+    <!-- Load ScenarioLoader -->
+    <script src="js/core/scenario-loader.js"></script>
+
+    <script>
+        let selectedSlot = null;
+
+        /**
+         * Initialize the scenario selection page
+         */
+        function init() {
+            loadScenarios();
+            bindEvents();
+        }
+
+        /**
+         * Load and display available scenarios
+         */
+        function loadScenarios() {
+            const grid = document.getElementById('scenarioGrid');
+            const scenarios = ScenarioLoader.getAvailableScenarios();
+
+            if (scenarios.length === 0) {
+                grid.innerHTML = '<div class="no-scenarios">No scenarios available. Create one in the Admin Panel.</div>';
+                return;
+            }
+
+            grid.innerHTML = scenarios.map(scenario => createScenarioCard(scenario)).join('');
+
+            // Bind click events to cards
+            grid.querySelectorAll('.scenario-card:not(.empty)').forEach(card => {
+                card.addEventListener('click', () => selectScenario(card));
+            });
+
+            // Auto-select first available scenario
+            const firstAvailable = scenarios.find(s => !s.isEmpty);
+            if (firstAvailable !== undefined) {
+                selectedSlot = firstAvailable.slot;
+                updateSelection();
+            }
+        }
+
+        /**
+         * Create HTML for a scenario card
+         */
+        function createScenarioCard(scenario) {
+            const difficultyClass = getDifficultyClass(scenario.difficulty);
+            const slotType = scenario.isDefault ? 'default' : 'custom';
+            const emptyClass = scenario.isEmpty ? 'empty' : '';
+
+            const modifiedDate = scenario.modifiedAt
+                ? new Date(scenario.modifiedAt).toLocaleDateString()
+                : null;
+
+            return `
+                <div class="scenario-card ${emptyClass}" data-slot="${scenario.slot}">
+                    <div class="card-header">
+                        <span class="slot-badge ${slotType}">
+                            ${scenario.isDefault ? 'Default' : `Slot ${scenario.slot}`}
+                        </span>
+                        ${scenario.difficulty ? `
+                            <span class="difficulty-badge ${difficultyClass}">${scenario.difficulty}</span>
+                        ` : ''}
+                    </div>
+                    <div class="scenario-name">${escapeHtml(scenario.name)}</div>
+                    <div class="scenario-description">${escapeHtml(scenario.description || 'No description available.')}</div>
+                    <div class="scenario-meta">
+                        ${scenario.eventCount !== undefined ? `
+                            <div class="meta-item">
+                                <span class="icon">&#128197;</span>
+                                <span>${scenario.eventCount} events</span>
+                            </div>
+                        ` : ''}
+                        ${modifiedDate ? `
+                            <div class="meta-item">
+                                <span class="icon">&#128339;</span>
+                                <span>Modified: ${modifiedDate}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * Get CSS class for difficulty level
+         */
+        function getDifficultyClass(difficulty) {
+            switch (difficulty?.toLowerCase()) {
+                case 'easy': return 'difficulty-easy';
+                case 'hard': return 'difficulty-hard';
+                default: return 'difficulty-medium';
+            }
+        }
+
+        /**
+         * Select a scenario
+         */
+        function selectScenario(card) {
+            selectedSlot = parseInt(card.dataset.slot, 10);
+            updateSelection();
+        }
+
+        /**
+         * Update visual selection state
+         */
+        function updateSelection() {
+            // Remove selection from all cards
+            document.querySelectorAll('.scenario-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+
+            // Add selection to chosen card
+            const selectedCard = document.querySelector(`.scenario-card[data-slot="${selectedSlot}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
+
+            // Enable/disable start button
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = selectedSlot === null;
+        }
+
+        /**
+         * Bind event listeners
+         */
+        function bindEvents() {
+            const startBtn = document.getElementById('startBtn');
+            startBtn.addEventListener('click', startGame);
+        }
+
+        /**
+         * Start the game with selected scenario
+         */
+        function startGame() {
+            if (selectedSlot === null) return;
+
+            // Save selection and redirect to game
+            ScenarioLoader.selectScenario(selectedSlot);
+
+            // Redirect to game page (debug.html contains the actual game)
+            window.location.href = 'debug.html';
+        }
+
+        /**
+         * Escape HTML entities
+         */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
