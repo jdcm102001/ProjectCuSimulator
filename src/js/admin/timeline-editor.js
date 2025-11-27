@@ -15,7 +15,7 @@ const TimelineEditor = {
   minZoom: 0.5,
   maxZoom: 2,
 
-  // Column width at 100% zoom
+  // Column width at 100% zoom (fallback)
   baseColumnWidth: 80,
 
   // Next color to assign
@@ -27,6 +27,9 @@ const TimelineEditor = {
 
   // Pending event creation
   pendingEvent: null,
+
+  // Cached column width (updated on render)
+  cachedColumnWidth: null,
 
   // Track definitions
   TRACKS: {
@@ -185,8 +188,82 @@ const TimelineEditor = {
     this.bindKeyboard();
     this.bindClickOutside();
     this.bindNameModalEnter();
+    this.bindWindowResize();
 
     console.log('[TimelineEditor] Initialized');
+  },
+
+  /**
+   * Bind window resize to re-render with correct widths
+   */
+  bindWindowResize() {
+    window.addEventListener('resize', () => {
+      this.cachedColumnWidth = null; // Clear cache
+      this.renderTimeMarkers();
+      this.renderAllBars();
+    });
+  },
+
+  /**
+   * Get the exact width of one period column based on track content
+   * @returns {number} Width in pixels
+   */
+  getPeriodColumnWidth() {
+    // Return cached value if available
+    if (this.cachedColumnWidth) return this.cachedColumnWidth;
+
+    const trackContent = document.querySelector('.track-content');
+    if (!trackContent) {
+      return this.baseColumnWidth * this.zoom; // Fallback
+    }
+
+    const totalWidth = trackContent.offsetWidth;
+    this.cachedColumnWidth = totalWidth / 12; // 12 periods
+
+    return this.cachedColumnWidth;
+  },
+
+  /**
+   * Convert period number (1-12) to X position
+   * @param {number} period - Period number (1-12)
+   * @returns {number} X position in pixels (left edge of that period)
+   */
+  periodToX(period) {
+    const columnWidth = this.getPeriodColumnWidth();
+    return (period - 1) * columnWidth;
+  },
+
+  /**
+   * Convert X position to period number (1-12)
+   * @param {number} x - X position in pixels
+   * @returns {number} Period number (1-12)
+   */
+  xToPeriod(x) {
+    const columnWidth = this.getPeriodColumnWidth();
+    const period = Math.floor(x / columnWidth) + 1;
+    return Math.max(1, Math.min(12, period));
+  },
+
+  /**
+   * Snap X position to nearest period boundary
+   * @param {number} x - Raw X position
+   * @returns {number} Snapped X position (at period boundary)
+   */
+  snapToNearestPeriod(x) {
+    const columnWidth = this.getPeriodColumnWidth();
+    const period = Math.round(x / columnWidth);
+    return period * columnWidth;
+  },
+
+  /**
+   * Convert period number to human-readable label
+   * @param {number} period - Period number (1-12)
+   * @returns {string} Label like "Jan-E" or "Mar-L"
+   */
+  periodToLabel(period) {
+    const p = this.PERIODS.find(p => p.value === period);
+    if (!p) return `P${period}`;
+    return `${p.label}-${p.sub.charAt(0)}`;
   },
 
   /**
@@ -196,10 +273,12 @@ const TimelineEditor = {
     const container = document.getElementById('timeMarkers');
     if (!container) return;
 
-    const width = this.baseColumnWidth * this.zoom;
+    // Clear cache to get fresh measurement
+    this.cachedColumnWidth = null;
 
+    // Use flex: 1 for even distribution that matches track content
     container.innerHTML = this.PERIODS.map(p => `
-      <div class="time-marker" style="min-width: ${width}px">
+      <div class="time-marker">
         <div class="month">${p.label}</div>
         <div class="period">${p.sub}</div>
       </div>
@@ -282,23 +361,6 @@ const TimelineEditor = {
         this.promptEventName(trackType, trackType, period, false);
       });
     });
-  },
-
-  /**
-   * Convert x position to period number (1-12)
-   */
-  xToPeriod(x) {
-    const columnWidth = this.baseColumnWidth * this.zoom;
-    const period = Math.floor(x / columnWidth) + 1;
-    return Math.max(1, Math.min(12, period));
-  },
-
-  /**
-   * Convert period to x position
-   */
-  periodToX(period) {
-    const columnWidth = this.baseColumnWidth * this.zoom;
-    return (period - 1) * columnWidth;
   },
 
   /**
@@ -414,12 +476,26 @@ const TimelineEditor = {
     const colorIndex = this.getNextColor();
     const eventId = 'evt-' + Date.now();
 
+    // Default duration: 2 periods (1 full month = Early + Late)
+    // If dropped on a Late period (even number), start from Early of that month
+    let adjustedStart = startPeriod;
+    let adjustedEnd;
+
+    if (startPeriod % 2 === 0) {
+      // Late period - start from Early of the same month
+      adjustedStart = startPeriod - 1;
+      adjustedEnd = startPeriod;
+    } else {
+      // Early period - cover the full month (Early + Late)
+      adjustedEnd = Math.min(12, startPeriod + 1);
+    }
+
     const event = {
       id: eventId,
       name: name,
       colorIndex: colorIndex,
-      startPeriod: startPeriod,
-      endPeriod: Math.min(12, startPeriod + 2),
+      startPeriod: adjustedStart,
+      endPeriod: adjustedEnd,
       tracks: {
         [primaryTrack]: {
           effects: this.getDefaultEffects(primaryTrack)
@@ -493,9 +569,12 @@ const TimelineEditor = {
     const track = document.querySelector(`.track-content[data-track="${trackType}"]`);
     if (!track) return;
 
-    const columnWidth = this.baseColumnWidth * this.zoom;
+    // Use precise column width based on actual track content width
+    const columnWidth = this.getPeriodColumnWidth();
+
+    // Calculate EXACT position and width based on periods
     const left = (event.startPeriod - 1) * columnWidth;
-    const width = (event.endPeriod - event.startPeriod + 1) * columnWidth - 4; // -4 for gap
+    const width = (event.endPeriod - event.startPeriod + 1) * columnWidth;
 
     // Check if this is the primary track (first one added)
     const trackKeys = Object.keys(event.tracks);
@@ -506,8 +585,11 @@ const TimelineEditor = {
     bar.dataset.eventId = event.id;
     bar.dataset.track = trackType;
     bar.dataset.color = event.colorIndex;
-    bar.style.left = `${left}px`;
-    bar.style.width = `${width}px`;
+
+    // Use calc to account for inner margin while maintaining alignment
+    bar.style.left = `calc(${left}px + 2px)`;
+    bar.style.width = `calc(${width}px - 4px)`;
+    bar.style.boxSizing = 'border-box';
 
     bar.innerHTML = `
       <div class="resize-handle left"></div>
@@ -929,32 +1011,60 @@ const TimelineEditor = {
     const event = this.events.find(ev => ev.id === eventId);
     if (!event) return;
 
+    const track = bar.closest('.track-content');
+    const trackRect = track.getBoundingClientRect();
+    const columnWidth = this.getPeriodColumnWidth();
+
     const startX = e.clientX;
-    const originalStart = event.startPeriod;
-    const originalEnd = event.endPeriod;
-    const duration = originalEnd - originalStart;
+    const originalLeft = parseFloat(bar.style.left) || (event.startPeriod - 1) * columnWidth;
+    const barWidth = parseFloat(bar.style.width) || (event.endPeriod - event.startPeriod + 1) * columnWidth;
+    const duration = event.endPeriod - event.startPeriod;
 
     bar.classList.add('dragging');
     this.saveUndoState();
 
     const onMouseMove = (moveEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const deltaPeriods = Math.round(deltaX / (this.baseColumnWidth * this.zoom));
+      let newLeft = originalLeft + deltaX;
 
-      let newStart = originalStart + deltaPeriods;
-      newStart = Math.max(1, Math.min(12 - duration, newStart));
+      // Clamp to track bounds (free visual movement)
+      newLeft = Math.max(0, Math.min(trackRect.width - barWidth, newLeft));
 
-      event.startPeriod = newStart;
-      event.endPeriod = newStart + duration;
-
-      this.renderAllBars();
+      // Apply visual change (NOT snapped yet - free movement)
+      bar.style.left = `calc(${newLeft}px + 2px)`;
     };
 
     const onMouseUp = () => {
       bar.classList.remove('dragging');
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+
+      // NOW snap to period boundaries on mouse release
+      const currentLeftStr = bar.style.left;
+      // Parse the calc value - extract the px value
+      const match = currentLeftStr.match(/calc\(([0-9.]+)px/);
+      const currentLeft = match ? parseFloat(match[1]) : parseFloat(currentLeftStr);
+
+      // Calculate new start period (snap to nearest)
+      let newStartPeriod = Math.round(currentLeft / columnWidth) + 1;
+      newStartPeriod = Math.max(1, Math.min(12 - duration, newStartPeriod));
+
+      const newEndPeriod = newStartPeriod + duration;
+
+      // Update event data
+      event.startPeriod = newStartPeriod;
+      event.endPeriod = newEndPeriod;
+
+      // Re-render with snapped position
+      this.renderAllBars();
       this.updateGraphs();
+
+      // TWO-WAY SYNC: Update Basic Info panel if this event is selected
+      if (this.selectedEventId === eventId) {
+        this.openProperties(eventId);
+      }
+
+      console.log(`[Timeline] Moved "${event.name}" to periods ${newStartPeriod}-${newEndPeriod}`);
     };
 
     document.addEventListener('mousemove', onMouseMove);
@@ -966,38 +1076,115 @@ const TimelineEditor = {
    */
   startResize(bar, e, edge) {
     e.stopPropagation();
+    e.preventDefault();
 
     const eventId = bar.dataset.eventId;
     const event = this.events.find(ev => ev.id === eventId);
     if (!event) return;
 
-    const startX = e.clientX;
-    const originalStart = event.startPeriod;
-    const originalEnd = event.endPeriod;
+    const track = bar.closest('.track-content');
+    const trackRect = track.getBoundingClientRect();
+    const columnWidth = this.getPeriodColumnWidth();
 
+    const startX = e.clientX;
+    const originalLeft = (event.startPeriod - 1) * columnWidth;
+    const originalWidth = (event.endPeriod - event.startPeriod + 1) * columnWidth;
+    const originalStartPeriod = event.startPeriod;
+    const originalEndPeriod = event.endPeriod;
+
+    // Visual feedback during resize
+    bar.classList.add('resizing');
     this.saveUndoState();
 
     const onMouseMove = (moveEvent) => {
       const deltaX = moveEvent.clientX - startX;
-      const deltaPeriods = Math.round(deltaX / (this.baseColumnWidth * this.zoom));
 
       if (edge === 'left') {
-        let newStart = originalStart + deltaPeriods;
-        newStart = Math.max(1, Math.min(event.endPeriod, newStart));
-        event.startPeriod = newStart;
-      } else {
-        let newEnd = originalEnd + deltaPeriods;
-        newEnd = Math.max(event.startPeriod, Math.min(12, newEnd));
-        event.endPeriod = newEnd;
-      }
+        // Moving left edge
+        let newLeft = originalLeft + deltaX;
+        let newWidth = originalWidth - deltaX;
 
-      this.renderAllBars();
+        // Prevent negative width or going off track
+        if (newWidth < columnWidth) {
+          newWidth = columnWidth;
+          newLeft = originalLeft + originalWidth - columnWidth;
+        }
+        if (newLeft < 0) {
+          newLeft = 0;
+          newWidth = originalLeft + originalWidth;
+        }
+
+        // Apply visual change (NOT snapped yet)
+        bar.style.left = `calc(${newLeft}px + 2px)`;
+        bar.style.width = `calc(${newWidth}px - 4px)`;
+
+      } else {
+        // Moving right edge
+        let newWidth = originalWidth + deltaX;
+
+        // Prevent too small or going off track
+        if (newWidth < columnWidth) {
+          newWidth = columnWidth;
+        }
+        const maxWidth = trackRect.width - originalLeft;
+        if (newWidth > maxWidth) {
+          newWidth = maxWidth;
+        }
+
+        // Apply visual change (NOT snapped yet)
+        bar.style.width = `calc(${newWidth}px - 4px)`;
+      }
     };
 
     const onMouseUp = () => {
+      bar.classList.remove('resizing');
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+
+      // NOW snap to period boundaries on mouse release
+      const currentLeftStr = bar.style.left;
+      const currentWidthStr = bar.style.width;
+
+      // Parse calc values
+      const leftMatch = currentLeftStr.match(/calc\(([0-9.]+)px/);
+      const widthMatch = currentWidthStr.match(/calc\(([0-9.]+)px/);
+      const currentLeft = leftMatch ? parseFloat(leftMatch[1]) : originalLeft;
+      const currentWidth = widthMatch ? parseFloat(widthMatch[1]) : originalWidth;
+
+      let newStartPeriod, newEndPeriod;
+
+      if (edge === 'left') {
+        // Snap left edge to nearest period
+        newStartPeriod = Math.round(currentLeft / columnWidth) + 1;
+        newStartPeriod = Math.max(1, Math.min(originalEndPeriod, newStartPeriod));
+        newEndPeriod = originalEndPeriod;
+      } else {
+        // Snap right edge to nearest period
+        const rightEdge = currentLeft + currentWidth;
+        newEndPeriod = Math.round(rightEdge / columnWidth);
+        newEndPeriod = Math.max(originalStartPeriod, Math.min(12, newEndPeriod));
+        newStartPeriod = originalStartPeriod;
+      }
+
+      // Ensure minimum 1 period duration
+      if (newEndPeriod < newStartPeriod) {
+        newEndPeriod = newStartPeriod;
+      }
+
+      // Update event data
+      event.startPeriod = newStartPeriod;
+      event.endPeriod = newEndPeriod;
+
+      // Re-render with snapped position
+      this.renderAllBars();
       this.updateGraphs();
+
+      // TWO-WAY SYNC: Update Basic Info panel if this event is selected
+      if (this.selectedEventId === eventId) {
+        this.openProperties(eventId);
+      }
+
+      console.log(`[Timeline] Resized "${event.name}" to periods ${newStartPeriod}-${newEndPeriod}`);
     };
 
     document.addEventListener('mousemove', onMouseMove);
@@ -1080,6 +1267,8 @@ const TimelineEditor = {
     if (zoomLevel) {
       zoomLevel.textContent = `${Math.round(this.zoom * 100)}%`;
     }
+    // Clear cache and re-render
+    this.cachedColumnWidth = null;
     this.renderTimeMarkers();
     this.renderAllBars();
   },

@@ -206,18 +206,21 @@
   display: flex;
   flex: 1;
   min-width: 0;
+  /* Ensure no gaps or padding that could cause misalignment */
+  gap: 0;
+  padding: 0;
 }
 
 .time-marker {
-  flex: 1;
-  min-width: 60px;
+  flex: 1 1 0; /* Equal width distribution */
+  min-width: 0;
   padding: 8px 4px;
   text-align: center;
   font-size: 10px;
   color: #888;
   border-right: 1px solid #2a2a2a;
   background: #1a1a1a;
-  transition: min-width 0.2s;
+  box-sizing: border-box;
 }
 
 .time-marker:nth-child(odd) {
@@ -283,6 +286,10 @@
   min-height: 50px;
   display: flex;
   align-items: center;
+  /* Ensure no padding that could offset bars */
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .track-content.drag-over {
@@ -329,6 +336,10 @@
   z-index: 5;
   overflow: hidden;
   user-select: none;
+  /* Ensure box-sizing includes border in width calculation */
+  box-sizing: border-box;
+  /* NO margin - margins would cause misalignment */
+  margin: 0;
 }
 
 .event-bar:hover {
@@ -344,6 +355,13 @@
   opacity: 0.7;
   cursor: grabbing;
   z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.event-bar.resizing {
+  opacity: 0.85;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .event-bar.linked {
