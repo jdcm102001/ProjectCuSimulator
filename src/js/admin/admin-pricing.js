@@ -77,8 +77,12 @@ const AdminPricing = {
      * Load prices from simulation data
      */
     loadPrices(simData) {
+        console.log('[AdminPricing] loadPrices called with:', simData);
+        console.log('[AdminPricing] simData.pricing:', simData?.pricing);
+
         if (!simData || !simData.pricing) {
             // Use defaults
+            console.log('[AdminPricing] No pricing data, using defaults');
             simData = AdminStorage.getDefaultSimulation();
         }
 
@@ -89,9 +93,11 @@ const AdminPricing = {
         for (let month = 1; month <= 6; month++) {
             this.prices.lme[month] = { ...simData.pricing.lme[month] };
             this.prices.comex[month] = { ...simData.pricing.comex[month] };
+            console.log(`[AdminPricing] Month ${month} LME average:`, this.prices.lme[month].average);
         }
 
         // Update input fields
+        console.log('[AdminPricing] Calling updateInputFields()...');
         this.updateInputFields();
     },
 
@@ -187,13 +193,19 @@ const AdminPricing = {
      * Update all input fields with current prices
      */
     updateInputFields() {
+        console.log('[AdminPricing] updateInputFields called');
         for (let month = 1; month <= 6; month++) {
             // LME
             const lmeAvgInput = document.querySelector(`.month-prices[data-month="${month}"] .lme-avg`);
             const lmeEarlyInput = document.querySelector(`.month-prices[data-month="${month}"] .lme-early`);
             const lmeLateInput = document.querySelector(`.month-prices[data-month="${month}"] .lme-late`);
 
-            if (lmeAvgInput) lmeAvgInput.value = this.prices.lme[month].average;
+            if (lmeAvgInput) {
+                lmeAvgInput.value = this.prices.lme[month].average;
+                console.log(`[AdminPricing] Month ${month} LME avg input set to:`, lmeAvgInput.value);
+            } else {
+                console.warn(`[AdminPricing] Month ${month} LME avg input NOT FOUND`);
+            }
             if (lmeEarlyInput) lmeEarlyInput.value = this.prices.lme[month].early;
             if (lmeLateInput) lmeLateInput.value = this.prices.lme[month].late;
 
@@ -206,6 +218,7 @@ const AdminPricing = {
             if (comexEarlyInput) comexEarlyInput.value = this.prices.comex[month].early;
             if (comexLateInput) comexLateInput.value = this.prices.comex[month].late;
         }
+        console.log('[AdminPricing] updateInputFields complete');
     },
 
     /**
