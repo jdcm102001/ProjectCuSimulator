@@ -422,9 +422,10 @@
             // Redirect to game page with scenario URL parameter
             // This ensures the correct scenario loads even on page refresh
             // Add newgame=true to indicate this is a fresh game start (clears notifications)
+            // Add autostart=true to skip the scenario selection modal in index.html
             const scenarioParam = selectedSlot === 0 ? 'default' : `slot_${selectedSlot}`;
             console.log('[ScenarioSelect] Starting game with scenario:', scenarioParam);
-            window.location.href = `debug.html?scenario=${scenarioParam}&newgame=true`;
+            window.location.href = `index.html?scenario=${scenarioParam}&newgame=true&autostart=true`;
         }
 
         /**
