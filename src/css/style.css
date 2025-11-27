@@ -570,7 +570,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ANALYTICS WIDGET - 4-Card Dashboard
+   ANALYTICS WIDGET - Bloomberg Minimal Style
    ═══════════════════════════════════════════════════════════ */
 
 #analyticsContainer {
@@ -585,10 +585,10 @@ body {
 }
 
 .analytics-widget-content {
-    padding: 15px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 12px;
     height: 100%;
     box-sizing: border-box;
 }
@@ -596,38 +596,29 @@ body {
 /* Rows */
 .analytics-row {
     display: flex;
-    gap: 15px;
+    gap: 12px;
     flex: 1;
 }
 
-/* Cards */
+/* Cards - Bloomberg minimal */
 .analytics-card {
-    background: #1e1e1e;
+    background: #1a1a1a;
     border: 1px solid #333;
-    border-radius: 10px;
-    padding: 18px;
+    padding: 14px;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
-.analytics-card-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 15px;
-}
-
-.analytics-card-icon {
-    font-size: 16px;
-}
-
 .analytics-card-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: #888;
+    font-size: 10px;
+    font-weight: 600;
+    color: #666;
     text-transform: uppercase;
     letter-spacing: 1px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -635,7 +626,7 @@ body {
    ───────────────────────────────────────────────────────── */
 
 .analytics-pnl-section {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .analytics-pnl-section.total {
@@ -649,48 +640,48 @@ body {
 }
 
 .analytics-pnl-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #aaa;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.analytics-pnl-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #10b981;
-}
-
-.analytics-pnl-value.negative {
-    color: #ef4444;
-}
-
-.analytics-pnl-value .est-tag {
     font-size: 11px;
     font-weight: 500;
     color: #888;
 }
 
-.analytics-pnl-sublabel {
+.analytics-pnl-value {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4CAF50;
+}
+
+.analytics-pnl-value.negative {
+    color: #f44336;
+}
+
+.analytics-pnl-value .est-tag {
     font-size: 10px;
-    color: #666;
+    font-weight: 400;
+    color: #555;
+}
+
+.analytics-pnl-sublabel {
+    font-size: 9px;
+    color: #555;
     margin-top: 2px;
 }
 
 .analytics-pnl-divider {
     height: 1px;
     background: #333;
-    margin: 12px 0;
+    margin: 10px 0;
 }
 
 .analytics-pnl-section.total .analytics-pnl-label {
-    font-size: 13px;
-    color: #fff;
+    font-size: 11px;
+    color: #aaa;
+    font-weight: 600;
 }
 
 .analytics-pnl-section.total .analytics-pnl-value {
-    font-size: 22px;
+    font-size: 16px;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -698,27 +689,28 @@ body {
    ───────────────────────────────────────────────────────── */
 
 .analytics-spread-main {
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
-    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #888;
+    margin-bottom: 6px;
 }
 
 .analytics-spread-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #10b981;
-    margin-bottom: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: #4CAF50;
+    margin-bottom: 8px;
 }
 
 .analytics-spread-value.negative {
-    color: #ef4444;
+    color: #f44336;
 }
 
 .analytics-spread-hint {
-    font-size: 12px;
-    font-weight: 500;
-    color: #888;
+    font-size: 10px;
+    font-weight: 400;
+    color: #555;
     margin-top: auto;
 }
 
@@ -729,81 +721,78 @@ body {
 .analytics-bars {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     flex: 1;
 }
 
 .analytics-bar-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
 .analytics-bar-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #888;
-    width: 75px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 10px;
+    font-weight: 500;
+    color: #666;
+    width: 70px;
     flex-shrink: 0;
 }
 
 .analytics-bar-track {
     flex: 1;
-    height: 22px;
+    height: 16px;
     background: #252525;
-    border-radius: 6px;
+    border: 1px solid #333;
     overflow: hidden;
 }
 
 .analytics-bar-fill {
     height: 100%;
-    border-radius: 6px;
-    transition: width 0.4s ease;
-    min-width: 4px;
+    transition: width 0.3s ease;
+    min-width: 2px;
 }
 
-/* Bar Colors */
+/* Bar Colors - Solid muted colors */
 .analytics-bar-fill.transit {
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    background: #3b82f6;
 }
 
 .analytics-bar-fill.port {
-    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    background: #f59e0b;
 }
 
 .analytics-bar-fill.sold {
-    background: linear-gradient(90deg, #10b981, #34d399);
+    background: #4CAF50;
 }
 
 .analytics-bar-fill.settlement {
-    background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+    background: #8b5cf6;
 }
 
 .analytics-bar-value {
-    font-size: 13px;
-    font-weight: 600;
-    color: #fff;
-    width: 90px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: #aaa;
+    width: 80px;
     text-align: right;
     flex-shrink: 0;
 }
 
 .analytics-card-footer {
-    margin-top: 12px;
-    padding-top: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
     border-top: 1px solid #333;
-    font-size: 12px;
-    font-weight: 600;
-    color: #8b5cf6;
+    font-size: 10px;
+    font-weight: 500;
+    color: #666;
 }
 
 .analytics-empty {
-    color: #666;
-    font-size: 12px;
-    font-style: italic;
-    padding: 10px 0;
+    color: #555;
+    font-size: 11px;
+    padding: 8px 0;
 }
 
 /* Placeholder style (for backwards compatibility) */
@@ -813,30 +802,31 @@ body {
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #666;
+    color: #555;
     text-align: center;
 }
 
 .analytics-placeholder .placeholder-icon {
-    font-size: 48px;
-    margin-bottom: 15px;
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.3;
 }
 
 .analytics-placeholder .placeholder-title {
-    font-size: 18px;
-    color: #888;
-    margin-bottom: 8px;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 6px;
 }
 
 .analytics-placeholder .placeholder-message {
-    font-size: 14px;
-    color: #666;
+    font-size: 12px;
+    color: #555;
 }
 
 .analytics-placeholder .placeholder-hint {
-    font-size: 12px;
-    color: #555;
-    margin-top: 15px;
+    font-size: 10px;
+    color: #444;
+    margin-top: 12px;
 }
 
 /* ============ TRADE PANELS (Modals) ============ */
