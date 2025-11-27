@@ -43,33 +43,37 @@ const ScenarioLoader = {
     transformedMonthData: [],
 
     /**
-     * Initialize the loader - check URL params first, then localStorage
+     * Initialize the loader - check URL params first, default to slot 0 if no param
+     *
+     * IMPORTANT: When no URL parameter is provided, we default to slot 0 (default scenario)
+     * and do NOT fall back to localStorage. This prevents stale slot selections from
+     * persisting across sessions when users navigate directly to the game page.
      */
     init() {
         console.log('[ScenarioLoader] Initializing...');
 
-        // Check URL for scenario parameter first (takes priority)
+        // Check URL for scenario parameter
         const params = new URLSearchParams(window.location.search);
         const scenarioParam = params.get('scenario');
 
         console.log('[ScenarioLoader] URL scenario param:', scenarioParam);
 
-        if (scenarioParam) {
-            if (scenarioParam === 'default' || scenarioParam === '0') {
-                console.log('[ScenarioLoader] URL specifies default scenario');
-                this.selectScenario(0);
-            } else if (scenarioParam.startsWith('slot_')) {
-                const slotNum = parseInt(scenarioParam.replace('slot_', ''), 10);
-                console.log('[ScenarioLoader] URL specifies slot:', slotNum);
+        // ONLY load from slot_X if explicitly specified in URL
+        // No parameter or "default" → use default .js files (slot 0)
+        if (scenarioParam && scenarioParam.startsWith('slot_')) {
+            const slotNum = parseInt(scenarioParam.replace('slot_', ''), 10);
+            // Validate slot number (1-3)
+            if (slotNum >= 1 && slotNum <= 3) {
+                console.log('[ScenarioLoader] Loading CUSTOM scenario from slot:', slotNum);
                 this.selectScenario(slotNum);
             } else {
-                // Try parsing as number
-                const slotNum = parseInt(scenarioParam, 10);
-                if (!isNaN(slotNum)) {
-                    console.log('[ScenarioLoader] URL specifies slot number:', slotNum);
-                    this.selectScenario(slotNum);
-                }
+                console.warn('[ScenarioLoader] Invalid slot number:', slotNum, '- using default');
+                this.selectScenario(0);
             }
+        } else {
+            // No parameter, "default", "0", or anything else → use default .js files
+            console.log('[ScenarioLoader] Loading DEFAULT scenario from .js files');
+            this.selectScenario(0);
         }
 
         console.log('[ScenarioLoader] Using slot:', this.getSelectedSlot());
@@ -84,27 +88,29 @@ const ScenarioLoader = {
     },
 
     /**
-     * Get currently selected scenario slot - check URL first, then localStorage
+     * Get currently selected scenario slot
+     * ONLY slot_X URL params trigger custom scenarios, everything else returns 0 (default)
      */
     getSelectedSlot() {
-        // Check URL params first
+        // Check URL params - ONLY slot_X triggers custom scenario
         const params = new URLSearchParams(window.location.search);
         const scenarioParam = params.get('scenario');
 
-        if (scenarioParam) {
-            if (scenarioParam === 'default' || scenarioParam === '0') {
-                return 0;
-            } else if (scenarioParam.startsWith('slot_')) {
-                return parseInt(scenarioParam.replace('slot_', ''), 10);
-            } else {
-                const num = parseInt(scenarioParam, 10);
-                if (!isNaN(num)) return num;
+        if (scenarioParam && scenarioParam.startsWith('slot_')) {
+            const slotNum = parseInt(scenarioParam.replace('slot_', ''), 10);
+            // Validate slot number (1-3)
+            if (slotNum >= 1 && slotNum <= 3) {
+                return slotNum;
             }
         }
 
-        // Fall back to localStorage
-        const slot = localStorage.getItem(this.SELECTED_SLOT_KEY);
-        return slot !== null ? parseInt(slot, 10) : 0;
+        // Default scenario (slot 0) for:
+        // - No URL parameter
+        // - scenario=default
+        // - scenario=0
+        // - Any invalid value
+        // Note: We intentionally do NOT fall back to localStorage to avoid stale slot selections
+        return 0;
     },
 
     /**
