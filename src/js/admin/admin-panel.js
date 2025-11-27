@@ -126,8 +126,15 @@ const AdminPanel = {
             return;
         }
 
-        // Load default or slot 1 simulation
-        this.currentSimulation = AdminStorage.loadSimulation(0) || AdminStorage.getDefaultSimulation();
+        // Check if there's a last-loaded slot to restore
+        const lastSlot = localStorage.getItem('admin_last_loaded_slot');
+        const slotToLoad = lastSlot ? parseInt(lastSlot, 10) : 0;
+
+        console.log('[AdminPanel] Opening panel, loading slot:', slotToLoad);
+
+        // Load the last-used slot or default
+        this.currentSimulation = AdminStorage.loadSimulation(slotToLoad) || AdminStorage.getDefaultSimulation();
+        this.selectedSlot = slotToLoad === 0 ? 1 : slotToLoad;
 
         // Show panel
         const panel = document.getElementById('adminPanel');
@@ -137,6 +144,12 @@ const AdminPanel = {
 
         // Initialize sub-modules
         this.initializeModules();
+
+        // Update slot selector
+        const slotSelect = document.getElementById('saveSlotSelect');
+        if (slotSelect) {
+            slotSelect.value = this.selectedSlot;
+        }
 
         // Switch to pricing tab
         this.switchTab('pricing');
@@ -468,6 +481,10 @@ const AdminPanel = {
         const result = AdminStorage.saveSimulation(this.selectedSlot, simData);
 
         if (result.success) {
+            // Remember this slot for auto-load on page refresh
+            localStorage.setItem('admin_last_loaded_slot', this.selectedSlot.toString());
+            console.log('[AdminPanel] Saved to slot', this.selectedSlot, '- will auto-load on refresh');
+
             let message = `Saved to Slot ${this.selectedSlot}!`;
             if (result.warnings && result.warnings.length > 0) {
                 message += `\n\nWarnings:\n${result.warnings.join('\n')}`;
@@ -655,6 +672,10 @@ const AdminPanel = {
         console.log('[AdminPanel] Events count:', sim.events?.length || 0);
 
         this.currentSimulation = sim;
+
+        // Remember this slot for auto-load on page refresh
+        localStorage.setItem('admin_last_loaded_slot', slotNumber.toString());
+        console.log('[AdminPanel] Remembering slot', slotNumber, 'for auto-load on refresh');
 
         // Re-initialize all modules with new data
         console.log('[AdminPanel] Calling initializeModules()...');
