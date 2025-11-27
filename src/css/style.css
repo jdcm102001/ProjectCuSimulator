@@ -569,7 +569,10 @@ body {
     margin-bottom: 5px;
 }
 
-/* Analytics Widget */
+/* ═══════════════════════════════════════════════════════════
+   ANALYTICS WIDGET - 4-Card Dashboard
+   ═══════════════════════════════════════════════════════════ */
+
 #analyticsContainer {
     width: 100%;
     height: 100%;
@@ -579,6 +582,261 @@ body {
 #futuresChart {
     width: 100%;
     height: 100%;
+}
+
+.analytics-widget-content {
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* Rows */
+.analytics-row {
+    display: flex;
+    gap: 15px;
+    flex: 1;
+}
+
+/* Cards */
+.analytics-card {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.analytics-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.analytics-card-icon {
+    font-size: 16px;
+}
+
+.analytics-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   P&L CARD
+   ───────────────────────────────────────────────────────── */
+
+.analytics-pnl-section {
+    margin-bottom: 12px;
+}
+
+.analytics-pnl-section.total {
+    margin-bottom: 0;
+}
+
+.analytics-pnl-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.analytics-pnl-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.analytics-pnl-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #10b981;
+}
+
+.analytics-pnl-value.negative {
+    color: #ef4444;
+}
+
+.analytics-pnl-value .est-tag {
+    font-size: 11px;
+    font-weight: 500;
+    color: #888;
+}
+
+.analytics-pnl-sublabel {
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.analytics-pnl-divider {
+    height: 1px;
+    background: #333;
+    margin: 12px 0;
+}
+
+.analytics-pnl-section.total .analytics-pnl-label {
+    font-size: 13px;
+    color: #fff;
+}
+
+.analytics-pnl-section.total .analytics-pnl-value {
+    font-size: 22px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   SPREAD CARD
+   ───────────────────────────────────────────────────────── */
+
+.analytics-spread-main {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.analytics-spread-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #10b981;
+    margin-bottom: 12px;
+}
+
+.analytics-spread-value.negative {
+    color: #ef4444;
+}
+
+.analytics-spread-hint {
+    font-size: 12px;
+    font-weight: 500;
+    color: #888;
+    margin-top: auto;
+}
+
+/* ─────────────────────────────────────────────────────────
+   BAR CHARTS (Position Status & Settlement Timing)
+   ───────────────────────────────────────────────────────── */
+
+.analytics-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.analytics-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.analytics-bar-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    width: 75px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.analytics-bar-track {
+    flex: 1;
+    height: 22px;
+    background: #252525;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.analytics-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.4s ease;
+    min-width: 4px;
+}
+
+/* Bar Colors */
+.analytics-bar-fill.transit {
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.analytics-bar-fill.port {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.analytics-bar-fill.sold {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.analytics-bar-fill.settlement {
+    background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+}
+
+.analytics-bar-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    width: 90px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.analytics-card-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #333;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8b5cf6;
+}
+
+.analytics-empty {
+    color: #666;
+    font-size: 12px;
+    font-style: italic;
+    padding: 10px 0;
+}
+
+/* Placeholder style (for backwards compatibility) */
+.analytics-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+    text-align: center;
+}
+
+.analytics-placeholder .placeholder-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.analytics-placeholder .placeholder-title {
+    font-size: 18px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.analytics-placeholder .placeholder-message {
+    font-size: 14px;
+    color: #666;
+}
+
+.analytics-placeholder .placeholder-hint {
+    font-size: 12px;
+    color: #555;
+    margin-top: 15px;
 }
 
 /* ============ TRADE PANELS (Modals) ============ */
