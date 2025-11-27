@@ -360,14 +360,14 @@ const ScenarioLoader = {
                     SPOT_AVG: lmePricing.average,
                     FUTURES_1M: Math.round(lmePricing.average * 1.01),
                     FUTURES_3M: Math.round(lmePricing.average * 1.03),
-                    FUTURES_12M: Math.round(lmePricing.average * 1.07),
+                    FUTURES_6M: Math.round(lmePricing.average * 1.07),
                     CURVE_STRUCTURE: 'Contango'
                 },
                 COMEX: {
                     SPOT_AVG: comexPricing.average,
                     FUTURES_1M: Math.round(comexPricing.average * 1.01),
                     FUTURES_3M: Math.round(comexPricing.average * 1.03),
-                    FUTURES_12M: Math.round(comexPricing.average * 1.07),
+                    FUTURES_6M: Math.round(comexPricing.average * 1.07),
                     CURVE_STRUCTURE: 'Contango'
                 },
                 M_PLUS_1: {
@@ -512,7 +512,7 @@ const ScenarioLoader = {
                     data.PRICING.LME.SPOT_AVG += change;
                     data.PRICING.LME.FUTURES_1M += change;
                     data.PRICING.LME.FUTURES_3M += change * 0.9;
-                    data.PRICING.LME.FUTURES_12M += change * 0.7;
+                    data.PRICING.LME.FUTURES_6M += change * 0.7;
                     data.PRICING.M_PLUS_1.LME_AVG += change;
                 }
                 if (priceEffects.comex) {
@@ -520,7 +520,7 @@ const ScenarioLoader = {
                     data.PRICING.COMEX.SPOT_AVG += change;
                     data.PRICING.COMEX.FUTURES_1M += change;
                     data.PRICING.COMEX.FUTURES_3M += change * 0.9;
-                    data.PRICING.COMEX.FUTURES_12M += change * 0.7;
+                    data.PRICING.COMEX.FUTURES_6M += change * 0.7;
                     data.PRICING.M_PLUS_1.COMEX_AVG += change;
                 }
             }
@@ -617,13 +617,13 @@ const ScenarioLoader = {
             data.PRICING.LME.SPOT_AVG += lmeChange;
             data.PRICING.LME.FUTURES_1M += lmeChange;
             data.PRICING.LME.FUTURES_3M += lmeChange * 0.9;
-            data.PRICING.LME.FUTURES_12M += lmeChange * 0.7;
+            data.PRICING.LME.FUTURES_6M += lmeChange * 0.7;
             data.PRICING.M_PLUS_1.LME_AVG += lmeChange;
 
             data.PRICING.COMEX.SPOT_AVG += comexChange;
             data.PRICING.COMEX.FUTURES_1M += comexChange;
             data.PRICING.COMEX.FUTURES_3M += comexChange * 0.9;
-            data.PRICING.COMEX.FUTURES_12M += comexChange * 0.7;
+            data.PRICING.COMEX.FUTURES_6M += comexChange * 0.7;
             data.PRICING.M_PLUS_1.COMEX_AVG += comexChange;
         }
     },

@@ -230,6 +230,43 @@ const NotificationManager = {
         this.updateBadge();
         this.saveToStorage();
         this.renderList();
+    },
+
+    /**
+     * Reset for new game - clears notifications and triggered events
+     */
+    resetForNewGame() {
+        console.log('[NOTIF] Resetting for new game');
+        this.clearAll();
+        localStorage.removeItem('perseverance_triggered_events');
+    },
+
+    /**
+     * Get set of triggered event IDs
+     */
+    getTriggeredEvents() {
+        try {
+            const saved = localStorage.getItem('perseverance_triggered_events');
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch (e) {
+            return new Set();
+        }
+    },
+
+    /**
+     * Mark an event as triggered
+     */
+    markEventTriggered(eventId) {
+        const triggered = this.getTriggeredEvents();
+        triggered.add(eventId);
+        localStorage.setItem('perseverance_triggered_events', JSON.stringify([...triggered]));
+    },
+
+    /**
+     * Check if an event has been triggered
+     */
+    isEventTriggered(eventId) {
+        return this.getTriggeredEvents().has(eventId);
     }
 };
 
@@ -426,6 +463,18 @@ const GAME_STATE = {
     init() {
         console.log('[GAME] Initializing...');
 
+        // Check for new game (coming from scenario-select.html with newgame=true)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isNewGame = urlParams.get('newgame') === 'true';
+        if (isNewGame) {
+            console.log('[GAME] New game detected - resetting notifications and events');
+            NotificationManager.resetForNewGame();
+            // Remove newgame param from URL to prevent reset on subsequent refreshes
+            urlParams.delete('newgame');
+            const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+            window.history.replaceState({}, '', newUrl);
+        }
+
         // Initialize TimeManager
         TimeManager.init();
 
@@ -473,6 +522,9 @@ const GAME_STATE = {
 
         // Update header display
         this.updateHeader();
+
+        // Check for scenario events at game start (Turn 1)
+        this.checkScenarioEvents();
     },
 
     /**
@@ -629,6 +681,9 @@ const GAME_STATE = {
         if (typeof BankWidget !== 'undefined') BankWidget.render();
 
         console.log('[GAME] Now on Turn', TimeManager.currentTurn, '-', result.details.monthName, result.details.periodName);
+
+        // Check for scenario events at the new turn
+        this.checkScenarioEvents();
 
         // Update debug panels
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
@@ -1386,6 +1441,67 @@ const GAME_STATE = {
             pos.unrealizedPL = priceDiff * contractSize * pos.contracts;
             pos.currentPrice = currentPrice;
         });
+    },
+
+    /**
+     * Check and trigger scenario events for the current turn
+     * Events are fetched from ScenarioLoader and displayed as notifications
+     * Each event only triggers once (tracked in localStorage)
+     */
+    checkScenarioEvents() {
+        if (!window.ScenarioLoader) {
+            console.log('[EVENTS] ScenarioLoader not available');
+            return;
+        }
+
+        const events = ScenarioLoader.getEvents();
+        if (!events || events.length === 0) {
+            console.log('[EVENTS] No scenario events to check');
+            return;
+        }
+
+        const currentTurn = TimeManager.currentTurn;
+        console.log(`[EVENTS] Checking events for turn ${currentTurn}...`);
+
+        events.forEach(event => {
+            // Check if event triggers on current turn
+            if (event.startPeriod !== currentTurn) return;
+
+            // Check if already triggered (prevents duplicates on page refresh)
+            if (NotificationManager.isEventTriggered(event.id)) {
+                console.log(`[EVENTS] Event "${event.name}" already triggered, skipping`);
+                return;
+            }
+
+            // Determine notification icon based on event type
+            let icon = '📰';  // Default news icon
+            if (event.type === 'event') {
+                icon = '⚠️';  // Major event icon
+            }
+            // Check affects to customize icon
+            if (event.affects) {
+                const hasPrice = event.affects.some(a => ['lme', 'comex', 'futures_1m', 'futures_3m', 'futures_6m'].includes(a.target));
+                const hasSupply = event.affects.some(a => a.target.includes('tonnage') || a.target.includes('premium'));
+                const hasShipping = event.affects.some(a => ['fob_rate', 'cif_rate', 'travel_time'].includes(a.target));
+
+                if (hasShipping) icon = '🚢';
+                else if (hasSupply) icon = '⛏️';
+                else if (hasPrice) icon = '📊';
+            }
+
+            // Add notification
+            NotificationManager.add(
+                event.type || 'news',
+                event.name || 'Market News',
+                event.text || event.description || 'A market event has occurred.',
+                icon
+            );
+
+            // Mark as triggered so it doesn't fire again on refresh
+            NotificationManager.markEventTriggered(event.id);
+
+            console.log(`[EVENTS] Triggered event: "${event.name}" (${event.type})`);
+        });
     }
 };
 
@@ -1504,7 +1620,7 @@ const MarketsWidget = {
         html += '<div class="markets-section">';
         html += '<h4>EXCHANGE PRICES</h4>';
         html += '<table class="market-table">';
-        html += '<tr><th>Exchange</th><th>Spot</th><th>1M</th><th>3M</th><th>12M</th></tr>';
+        html += '<tr><th>Exchange</th><th>Spot</th><th>1M</th><th>3M</th><th>6M</th></tr>';
 
         const lme = data.PRICING.LME;
         const comex = data.PRICING.COMEX;
@@ -1515,14 +1631,14 @@ const MarketsWidget = {
                 <td>$${lme.SPOT_AVG}</td>
                 <td>$${lme.FUTURES_1M}</td>
                 <td>$${lme.FUTURES_3M}</td>
-                <td>$${lme.FUTURES_12M}</td>
+                <td>$${lme.FUTURES_6M}</td>
             </tr>
             <tr>
                 <td>COMEX</td>
                 <td>$${comex.SPOT_AVG}</td>
                 <td>$${comex.FUTURES_1M}</td>
                 <td>$${comex.FUTURES_3M}</td>
-                <td>$${comex.FUTURES_12M}</td>
+                <td>$${comex.FUTURES_6M}</td>
             </tr>
         `;
         html += '</table></div>';
@@ -1876,7 +1992,7 @@ const FuturesWidget = {
         'SPOT_AVG': 'Spot',
         'FUTURES_1M': '1M',
         'FUTURES_3M': '3M',
-        'FUTURES_12M': '12M'
+        'FUTURES_6M': '6M'
     },
 
     /**
@@ -1904,7 +2020,7 @@ const FuturesWidget = {
         html += '<h4>LME COPPER</h4>';
         html += '<div class="futures-grid">';
 
-        ['SPOT_AVG', 'FUTURES_1M', 'FUTURES_3M', 'FUTURES_12M'].forEach(contract => {
+        ['SPOT_AVG', 'FUTURES_1M', 'FUTURES_3M', 'FUTURES_6M'].forEach(contract => {
             const price = data.PRICING.LME[contract];
             const label = this.contractLabels[contract];
             html += `
@@ -1925,7 +2041,7 @@ const FuturesWidget = {
         html += '<h4>COMEX COPPER</h4>';
         html += '<div class="futures-grid">';
 
-        ['SPOT_AVG', 'FUTURES_1M', 'FUTURES_3M', 'FUTURES_12M'].forEach(contract => {
+        ['SPOT_AVG', 'FUTURES_1M', 'FUTURES_3M', 'FUTURES_6M'].forEach(contract => {
             const price = data.PRICING.COMEX[contract];
             const label = this.contractLabels[contract];
             html += `
@@ -3024,13 +3140,13 @@ Inventory:      ${GAME_STATE.inventory} MT
   Spot:  $${data.PRICING.LME.SPOT_AVG}
   1M:    $${data.PRICING.LME.FUTURES_1M}
   3M:    $${data.PRICING.LME.FUTURES_3M}
-  12M:   $${data.PRICING.LME.FUTURES_12M}
+  6M:   $${data.PRICING.LME.FUTURES_6M}
 
 COMEX:
   Spot:  $${data.PRICING.COMEX.SPOT_AVG}
   1M:    $${data.PRICING.COMEX.FUTURES_1M}
   3M:    $${data.PRICING.COMEX.FUTURES_3M}
-  12M:   $${data.PRICING.COMEX.FUTURES_12M}`;
+  6M:   $${data.PRICING.COMEX.FUTURES_6M}`;
     },
 
     /**
