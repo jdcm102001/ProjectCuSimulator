@@ -1200,8 +1200,14 @@ const GAME_STATE = {
         console.log('[TRADE] Selling', tonnage, 'MT to buyer index', buyerIndex);
 
         const position = this.physicalPositions.find(p => p.id === positionId);
-        if (!position || position.status !== 'ARRIVED') {
-            alert('Invalid position or position not arrived!');
+        if (!position) {
+            alert('Invalid position!');
+            return false;
+        }
+
+        // Check if already sold (but allow in-transit sales - player owns Bill of Lading)
+        if (position.sold || position.status === 'SOLD') {
+            alert('This cargo has already been sold!');
             return false;
         }
 
@@ -1245,6 +1251,7 @@ const GAME_STATE = {
         // Update position
         if (tonnage === position.tonnage) {
             position.status = 'SOLD';
+            position.sold = true;  // Mark as sold so it won't appear in inventory
         } else {
             position.tonnage -= tonnage;
         }
@@ -2894,22 +2901,38 @@ const TradePanel = {
 
     /**
      * Populate inventory dropdown
+     * Shows ALL unsold positions - cargo can be sold while in transit (player owns Bill of Lading)
      */
     populateInventory(selectedId) {
         const select = document.getElementById('sellInventory');
         select.innerHTML = '';
 
-        const arrivedPositions = GAME_STATE.physicalPositions.filter(p => p.status === 'ARRIVED');
+        // Show ALL unsold positions regardless of transit status
+        // When you buy cargo and pay, you get the Bill of Lading = ownership
+        // You can sell cargo at any point: IN_TRANSIT, AT_PORT, or ARRIVED
+        const unsoldPositions = GAME_STATE.physicalPositions.filter(p => !p.sold);
 
-        if (arrivedPositions.length === 0) {
+        if (unsoldPositions.length === 0) {
             select.innerHTML = '<option value="">No inventory available</option>';
             return;
         }
 
-        arrivedPositions.forEach(pos => {
+        unsoldPositions.forEach(pos => {
             const selected = pos.id === selectedId ? 'selected' : '';
-            const location = pos.currentPortName || pos.destinationPortName || pos.destination;
-            select.innerHTML += `<option value="${pos.id}" ${selected}>${pos.tonnage} MT at ${location}</option>`;
+
+            // Show status so player knows where cargo is
+            let statusLabel;
+            switch(pos.status) {
+                case 'IN_TRANSIT': statusLabel = 'In Transit'; break;
+                case 'AT_PORT': statusLabel = 'At Port'; break;
+                case 'ARRIVED': statusLabel = 'Arrived'; break;
+                default: statusLabel = pos.status || 'Unknown';
+            }
+
+            const location = pos.currentPortName || pos.destinationPortName || pos.destination || 'Unknown';
+            const origin = pos.origin || pos.supplier || '';
+
+            select.innerHTML += `<option value="${pos.id}" ${selected}>${pos.tonnage} MT from ${origin} - ${statusLabel} (${location})</option>`;
         });
 
         this.updateSellCalc();
