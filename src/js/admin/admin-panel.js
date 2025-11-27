@@ -776,7 +776,9 @@ const ScenarioSelection = {
      * Select a scenario slot
      */
     selectSlot(slot) {
+        console.log('[ScenarioSelection] selectSlot called with:', slot, 'type:', typeof slot);
         this.selectedSlot = slot;
+        console.log('[ScenarioSelection] selectedSlot is now:', this.selectedSlot);
         this.renderScenarioList();
     },
 
@@ -812,7 +814,10 @@ const ScenarioSelection = {
      * Navigates to debug.html with the correct URL parameter so ScenarioLoader picks it up
      */
     startGame() {
+        console.log('[ScenarioSelection] startGame called, selectedSlot:', this.selectedSlot, 'type:', typeof this.selectedSlot);
+
         const sim = AdminStorage.loadSimulation(this.selectedSlot);
+        console.log('[ScenarioSelection] Loaded sim for slot', this.selectedSlot, ':', sim ? 'found' : 'null');
 
         if (!sim && this.selectedSlot !== 0) {
             alert('Selected scenario is empty. Please select a valid scenario or create one in the Admin Panel.');
@@ -822,8 +827,9 @@ const ScenarioSelection = {
         // Navigate to game page with URL parameter
         // This ensures ScenarioLoader will correctly load the selected slot
         const scenarioParam = this.selectedSlot === 0 ? 'default' : `slot_${this.selectedSlot}`;
-        console.log('[ScenarioSelection] Starting game with scenario:', scenarioParam);
-        window.location.href = `debug.html?scenario=${scenarioParam}&newgame=true`;
+        const url = `debug.html?scenario=${scenarioParam}&newgame=true`;
+        console.log('[ScenarioSelection] Navigating to:', url);
+        window.location.href = url;
     },
 
     /**
