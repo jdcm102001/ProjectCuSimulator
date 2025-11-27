@@ -811,7 +811,8 @@ const ScenarioSelection = {
 
     /**
      * Start game with selected scenario
-     * Navigates to debug.html with the correct URL parameter so ScenarioLoader picks it up
+     * Reloads index.html with the correct URL parameter so ScenarioLoader picks it up
+     * Uses autostart=true to skip showing the scenario selection screen again
      */
     startGame() {
         console.log('[ScenarioSelection] startGame called, selectedSlot:', this.selectedSlot, 'type:', typeof this.selectedSlot);
@@ -824,10 +825,11 @@ const ScenarioSelection = {
             return;
         }
 
-        // Navigate to game page with URL parameter
+        // Navigate to index.html with URL parameter
+        // autostart=true skips the scenario selection screen
         // This ensures ScenarioLoader will correctly load the selected slot
         const scenarioParam = this.selectedSlot === 0 ? 'default' : `slot_${this.selectedSlot}`;
-        const url = `debug.html?scenario=${scenarioParam}&newgame=true`;
+        const url = `index.html?scenario=${scenarioParam}&newgame=true&autostart=true`;
         console.log('[ScenarioSelection] Navigating to:', url);
         window.location.href = url;
     },
@@ -1106,10 +1108,19 @@ if (typeof window !== 'undefined') {
         ScenarioSelection.init();
 
         // Show scenario selection on page load
-        // Allow direct game start via URL param ?quickstart=true
+        // Skip if:
+        // - quickstart=true (legacy)
+        // - autostart=true (from ScenarioSelection.startGame)
+        // - scenario= param is present (coming from startGame or scenario-select.html)
         const url = new URL(window.location.href);
-        if (url.searchParams.get('quickstart') !== 'true') {
+        const hasQuickstart = url.searchParams.get('quickstart') === 'true';
+        const hasAutostart = url.searchParams.get('autostart') === 'true';
+        const hasScenarioParam = url.searchParams.get('scenario') !== null;
+
+        if (!hasQuickstart && !hasAutostart && !hasScenarioParam) {
             ScenarioSelection.show();
+        } else {
+            console.log('[Admin] Skipping scenario selection - autostart or scenario param present');
         }
 
         console.log('[Admin] Module initialization complete');
