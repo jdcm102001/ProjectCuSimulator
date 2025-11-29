@@ -1710,15 +1710,23 @@ const PositionsWidget = {
 
         let html = '';
 
-        // Physical positions only
+        // Physical positions - show ALL including SOLD (until QP settles)
         html += '<div class="positions-container">';
 
-        const physPositions = GAME_STATE.physicalPositions.filter(p => p.status !== 'SOLD');
+        // Show all positions - open positions first, then sold/settled
+        const allPositions = GAME_STATE.physicalPositions;
+        const openPositions = allPositions.filter(p => p.status !== 'SOLD');
+        const soldPositions = allPositions.filter(p => p.status === 'SOLD');
 
-        if (physPositions.length === 0) {
+        if (allPositions.length === 0) {
             html += '<div class="empty-state">No physical positions</div>';
         } else {
-            physPositions.forEach(pos => {
+            // Render open positions first
+            openPositions.forEach(pos => {
+                html += this.renderPositionCard(pos);
+            });
+            // Then sold positions
+            soldPositions.forEach(pos => {
                 html += this.renderPositionCard(pos);
             });
         }
@@ -1733,6 +1741,7 @@ const PositionsWidget = {
     renderPositionCard(pos) {
         const isInTransit = pos.status === 'IN_TRANSIT';
         const isArrived = pos.status === 'ARRIVED';
+        const isSold = pos.status === 'SOLD';
         const currentTurn = TimeManager.currentTurn;
 
         // Get timing info
@@ -1748,13 +1757,24 @@ const PositionsWidget = {
         const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
 
         // Determine timeline stage
-        // Stage 1: Just purchased (before sailed)
-        // Stage 2: In transit (sailed but not arrived)
-        // Stage 3: Arrived
-        // Stage 4: QP Settled
         const hasSailed = currentTurn >= sailedTurn;
-        const hasArrived = isArrived || currentTurn >= pos.arrivalTurn;
+        const hasArrived = isArrived || isSold || currentTurn >= pos.arrivalTurn;
         const qpSettled = pos.qpRevealed === true;
+
+        // Find linked sale record for sold positions
+        let saleRecord = null;
+        let saleQpSettled = false;
+        let isFullyClosed = false;
+        if (isSold) {
+            // Check salesPendingQP and salesCompleted for this position
+            saleRecord = (GAME_STATE.salesPendingQP || []).find(s => s.positionId === pos.id) ||
+                         (GAME_STATE.salesCompleted || []).find(s => s.positionId === pos.id);
+            if (saleRecord) {
+                saleQpSettled = saleRecord.qpRevealed === true;
+            }
+            // Position is fully closed when both purchase and sale QP have settled
+            isFullyClosed = qpSettled && saleQpSettled;
+        }
 
         // Timeline dot states
         const purchaseDot = 'completed';
@@ -1775,8 +1795,37 @@ const PositionsWidget = {
         const totalCost = pos.qpRevealed ? (pos.actualTotalCost || pos.totalCost) : pos.totalCost;
         const costLabel = pos.qpRevealed ? 'Locked' : 'Provisional';
 
-        // Location badge (only for arrived)
-        const locationHtml = isArrived ? `
+        // Determine card class
+        let cardClass = '';
+        if (isSold) {
+            cardClass = isFullyClosed ? 'sold closed' : 'sold';
+        } else if (isInTransit) {
+            cardClass = 'in-transit';
+        } else {
+            cardClass = 'arrived';
+        }
+
+        // Status badge
+        let statusBadgeClass = '';
+        let statusBadgeText = '';
+        if (isSold) {
+            if (isFullyClosed) {
+                statusBadgeClass = 'closed';
+                statusBadgeText = 'CLOSED';
+            } else {
+                statusBadgeClass = 'sold';
+                statusBadgeText = 'SOLD - PENDING';
+            }
+        } else if (isInTransit) {
+            statusBadgeClass = 'transit';
+            statusBadgeText = 'IN TRANSIT';
+        } else {
+            statusBadgeClass = 'arrived';
+            statusBadgeText = 'ARRIVED';
+        }
+
+        // Location badge (only for arrived, not sold)
+        const locationHtml = (isArrived && !isSold) ? `
             <div class="location-row">
                 <span class="icon">[LOC]</span>
                 <span class="text">At ${pos.currentPortName || pos.destinationPortName || pos.destination}</span>
@@ -1792,15 +1841,40 @@ const PositionsWidget = {
             qpRevealHtml = `<span class="qp-reveal pending">[..] Reveals ${revealMonth} Early</span>`;
         }
 
+        // Sale section for sold positions
+        let saleSectionHtml = '';
+        if (isSold && saleRecord) {
+            const saleRevenue = saleQpSettled ?
+                (saleRecord.actualRevenue || saleRecord.estimatedRevenue) :
+                saleRecord.estimatedRevenue;
+            const saleProfit = saleQpSettled ?
+                (saleRecord.actualProfit || saleRecord.estimatedProfit) :
+                saleRecord.estimatedProfit;
+            const profitClass = saleProfit >= 0 ? 'profit' : 'loss';
+            const saleLabel = saleQpSettled ? 'Final' : 'Est.';
+
+            saleSectionHtml = `
+                <div class="sale-section ${saleQpSettled ? 'settled' : ''}">
+                    <div class="sale-header">${saleLabel} Sale P&L</div>
+                    <div class="sale-details">
+                        <span class="sale-buyer">Sold to ${saleRecord.buyer}</span>
+                        <span class="sale-revenue">Rev: $${saleRevenue?.toLocaleString() || '0'}</span>
+                        <span class="sale-profit ${profitClass}">P&L: ${saleProfit >= 0 ? '+' : ''}$${saleProfit?.toLocaleString() || '0'}</span>
+                    </div>
+                    ${!saleQpSettled ? `<div class="sale-qp-pending">[..] Sale QP pending</div>` : ''}
+                </div>
+            `;
+        }
+
         return `
-            <div class="position-card ${isInTransit ? 'in-transit' : 'arrived'}">
+            <div class="position-card ${cardClass}">
                 <div class="card-header">
                     <div class="route">
                         ${pos.originPort}<span class="arrow">-></span><span class="dest">${pos.destinationPortName || pos.destination}</span>
                     </div>
                     <div class="header-right">
                         <span class="tonnage">${pos.tonnage} MT</span>
-                        <span class="status-badge ${isInTransit ? 'transit' : 'arrived'}">${isInTransit ? 'IN TRANSIT' : 'ARRIVED'}</span>
+                        <span class="status-badge ${statusBadgeClass}">${statusBadgeText}</span>
                     </div>
                 </div>
 
@@ -1869,6 +1943,8 @@ const PositionsWidget = {
                     <span class="qp-info">QP: <span class="month">${qpMonth}</span> avg</span>
                     ${qpRevealHtml}
                 </div>
+
+                ${saleSectionHtml}
             </div>
         `;
     }

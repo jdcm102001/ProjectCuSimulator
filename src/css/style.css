@@ -593,6 +593,93 @@ body {
     color: #4CAF50;
 }
 
+/* Sold Position Styles */
+.position-card.sold {
+    border-left: 3px solid #ff9800;
+}
+
+.position-card.sold.closed {
+    border-left: 3px solid #666;
+    opacity: 0.7;
+}
+
+.position-card.sold.closed * {
+    color: #888 !important;
+}
+
+.position-card.sold.closed .status-badge {
+    color: #666 !important;
+    border-color: #666 !important;
+}
+
+.status-badge.sold {
+    color: #ff9800;
+    border-color: #ff9800;
+}
+
+.status-badge.closed {
+    color: #666;
+    border-color: #666;
+}
+
+/* Sale Section */
+.position-card .sale-section {
+    padding: 10px 12px;
+    background: #252525;
+    border-top: 1px solid #ff9800;
+}
+
+.position-card .sale-section.settled {
+    border-top-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.position-card .sale-header {
+    font-size: 9px;
+    color: #ff9800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+}
+
+.position-card .sale-section.settled .sale-header {
+    color: #4CAF50;
+}
+
+.position-card .sale-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+
+.position-card .sale-buyer {
+    color: #888;
+}
+
+.position-card .sale-revenue {
+    color: #aaa;
+}
+
+.position-card .sale-profit {
+    font-weight: 600;
+}
+
+.position-card .sale-profit.profit {
+    color: #4CAF50;
+}
+
+.position-card .sale-profit.loss {
+    color: #f44336;
+}
+
+.position-card .sale-qp-pending {
+    font-size: 9px;
+    color: #ff9800;
+    margin-top: 4px;
+}
+
 /* Legacy status badge support */
 .status-badge.pending {
     color: #ff9800;
