@@ -8,12 +8,20 @@
     <meta http-equiv="Expires" content="0">
     <title>Perseverance - Trading Simulator</title>
 
-    <!-- Single CSS file -->
-    <link rel="stylesheet" href="css/style.css?v=6">
-
-    <!-- Admin Panel CSS -->
-    <link rel="stylesheet" href="css/admin-panel.css">
-    <link rel="stylesheet" href="css/timeline-editor.css">
+    <!-- Cache buster - forces fresh load on every page load -->
+    <script>
+        const cacheBuster = Date.now();
+        // Load all CSS with cache-busting timestamp
+        const cssFiles = ['css/style.css', 'css/admin-panel.css', 'css/timeline-editor.css'];
+        cssFiles.forEach(href => {
+            document.write('<link rel="stylesheet" href="' + href + '?t=' + cacheBuster + '">');
+        });
+    </script>
+    <noscript>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/admin-panel.css">
+        <link rel="stylesheet" href="css/timeline-editor.css">
+    </noscript>
 
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
@@ -1126,23 +1134,24 @@
         </div>
     </div>
 
-    <!-- Scenario Loader - Bridge between admin panel and game -->
-    <script src="js/core/scenario-loader.js?v=1"></script>
-
-    <!-- Main Application Script (cache-bust) -->
-    <script src="js/app.js?v=23"></script>
-
-    <!-- Enhanced Debug Panel (Development Only) -->
-    <script src="js/debug/debug-panel.js?v=5"></script>
-
-    <!-- Admin Panel Scripts -->
-    <script src="js/admin/admin-storage.js?v=2"></script>
-    <script src="js/admin/admin-pricing.js?v=2"></script>
-    <script src="js/admin/admin-events.js?v=2"></script>
-    <!-- New Event Builder System -->
-    <script src="js/admin/timeline-graphs.js?v=1"></script>
-    <script src="js/admin/timeline-editor.js?v=1"></script>
-    <script src="js/admin/save-load-debug.js?v=1"></script>
-    <script src="js/admin/admin-panel.js?v=2"></script>
+    <!-- Dynamic Script Loading with Cache Busting -->
+    <script>
+        // Load all scripts with cache-busting timestamp
+        const scripts = [
+            'js/core/scenario-loader.js',
+            'js/app.js',
+            'js/debug/debug-panel.js',
+            'js/admin/admin-storage.js',
+            'js/admin/admin-pricing.js',
+            'js/admin/admin-events.js',
+            'js/admin/timeline-graphs.js',
+            'js/admin/timeline-editor.js',
+            'js/admin/save-load-debug.js',
+            'js/admin/admin-panel.js'
+        ];
+        scripts.forEach(src => {
+            document.write('<script src="' + src + '?t=' + cacheBuster + '"><\/script>');
+        });
+    </script>
 </body>
 </html>
