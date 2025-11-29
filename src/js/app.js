@@ -678,6 +678,7 @@ const GAME_STATE = {
         PositionsWidget.render();
         FuturesWidget.render();
         AnalyticsWidget.render();
+        HedgeStatusWidget.render();
         if (typeof BankWidget !== 'undefined') BankWidget.render();
 
         console.log('[GAME] Now on Turn', TimeManager.currentTurn, '-', result.details.monthName, result.details.periodName);
@@ -1167,6 +1168,7 @@ const GAME_STATE = {
         // Update display
         this.updateHeader();
         PositionsWidget.render();
+        HedgeStatusWidget.render();
         MapWidget.addShipment(position);
 
         console.log('[TRADE] Position created:', position.id);
@@ -1320,6 +1322,7 @@ const GAME_STATE = {
         // Update display
         this.updateHeader();
         PositionsWidget.render();
+        HedgeStatusWidget.render();
 
         // Update debug panel
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
@@ -1378,6 +1381,7 @@ const GAME_STATE = {
         // Update display
         this.updateHeader();
         FuturesWidget.render();
+        HedgeStatusWidget.render();
 
         console.log('[FUTURES] Position opened:', position.id);
 
@@ -1417,6 +1421,7 @@ const GAME_STATE = {
         // Update display
         this.updateHeader();
         FuturesWidget.render();
+        HedgeStatusWidget.render();
 
         console.log('[FUTURES] Position closed with P&L:', pl);
 
@@ -3069,7 +3074,16 @@ const TabManager = {
                 FuturesWidget.render();
                 break;
             case 'Analytics':
+                // Show analytics, hide hedge status
+                document.getElementById('analyticsContainer').style.display = 'block';
+                document.getElementById('hedgeStatusContainer').style.display = 'none';
                 AnalyticsWidget.render();
+                break;
+            case 'HedgeStatus':
+                // Show hedge status, hide analytics
+                document.getElementById('analyticsContainer').style.display = 'none';
+                document.getElementById('hedgeStatusContainer').style.display = 'block';
+                HedgeStatusWidget.render();
                 break;
             case 'Map':
                 // Map is always visible
@@ -3514,6 +3528,395 @@ COMEX:
 
 
 // ============================================================
+// SECTION 10B: HEDGE STATUS WIDGET
+// ============================================================
+
+/**
+ * HedgeStatusWidget displays hedge coverage for physical positions
+ * Shows which positions are hedged, exposed, or partially hedged
+ */
+const HedgeStatusWidget = {
+    currentTab: 'hedges',
+    pendingPhysicalId: null,
+    pendingFuturesId: null,
+
+    /**
+     * Main render function
+     */
+    render() {
+        const container = document.getElementById('hedgeStatusContainer');
+        if (!container) return;
+
+        container.innerHTML = `
+            ${this.renderSummaryBar()}
+            <div class="hedge-sub-tabs">
+                <button class="hedge-sub-tab ${this.currentTab === 'hedges' ? 'active' : ''}"
+                        onclick="HedgeStatusWidget.switchTab('hedges')">
+                    Hedge Coverage
+                </button>
+                <button class="hedge-sub-tab ${this.currentTab === 'arbitrage' ? 'active' : ''}"
+                        onclick="HedgeStatusWidget.switchTab('arbitrage')">
+                    Arbitrage Opps
+                </button>
+            </div>
+            <div class="hedge-content">
+                ${this.currentTab === 'hedges' ? this.renderHedges() : this.renderArbitrage()}
+            </div>
+        `;
+    },
+
+    /**
+     * Render summary bar with counts and metrics
+     */
+    renderSummaryBar() {
+        const positions = GAME_STATE.physicalPositions.filter(p => p.status !== 'SOLD');
+        const futures = GAME_STATE.futuresPositions.filter(f => f.status === 'OPEN');
+
+        let hedged = 0, exposed = 0, partial = 0;
+        let totalDeployed = 0;
+
+        positions.forEach(pos => {
+            totalDeployed += pos.totalCost || 0;
+            const status = this.getHedgeStatus(pos);
+            if (status.status === 'hedged') hedged++;
+            else if (status.status === 'partial') partial++;
+            else exposed++;
+        });
+
+        return `
+            <div class="hedge-summary-bar">
+                <div class="hedge-summary-item">
+                    <span class="summary-label">Positions</span>
+                    <span class="summary-value">${positions.length}</span>
+                </div>
+                <div class="hedge-summary-item">
+                    <span class="summary-label">Deployed</span>
+                    <span class="summary-value">$${(totalDeployed/1000000).toFixed(2)}M</span>
+                </div>
+                <div class="hedge-summary-item hedged">
+                    <span class="summary-label">Hedged</span>
+                    <span class="summary-value">${hedged}</span>
+                </div>
+                <div class="hedge-summary-item exposed">
+                    <span class="summary-label">Exposed</span>
+                    <span class="summary-value">${exposed}</span>
+                </div>
+                <div class="hedge-summary-item partial">
+                    <span class="summary-label">Partial</span>
+                    <span class="summary-value">${partial}</span>
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Render hedge cards for all non-sold positions
+     */
+    renderHedges() {
+        const positions = GAME_STATE.physicalPositions.filter(p => p.status !== 'SOLD');
+
+        if (positions.length === 0) {
+            return this.renderEmptyState();
+        }
+
+        return `
+            <div class="hedge-cards-container">
+                ${positions.map(pos => this.renderHedgeCard(pos)).join('')}
+            </div>
+        `;
+    },
+
+    /**
+     * Render individual hedge card
+     */
+    renderHedgeCard(position) {
+        const hedgeStatus = this.getHedgeStatus(position);
+        const linkedFutures = this.getLinkedFutures(position);
+        const coverage = this.calculateCoverage(position, linkedFutures);
+
+        const statusClass = hedgeStatus.status;
+        const statusIcon = hedgeStatus.status === 'hedged' ? '🛡️' :
+                          hedgeStatus.status === 'partial' ? '⚠️' : '🔓';
+
+        return `
+            <div class="hedge-card ${statusClass}">
+                <div class="hedge-card-header">
+                    <div class="hedge-position-info">
+                        <span class="hedge-id">${position.id}</span>
+                        <span class="hedge-route">${position.supplier} → ${position.destination}</span>
+                    </div>
+                    <div class="hedge-status-badge ${statusClass}">
+                        ${statusIcon} ${hedgeStatus.label}
+                    </div>
+                </div>
+
+                <div class="hedge-card-body">
+                    <div class="hedge-metrics">
+                        <div class="hedge-metric">
+                            <span class="metric-label">Tonnage</span>
+                            <span class="metric-value">${position.tonnage} MT</span>
+                        </div>
+                        <div class="hedge-metric">
+                            <span class="metric-label">Value</span>
+                            <span class="metric-value">$${((position.totalCost || 0)/1000).toFixed(0)}K</span>
+                        </div>
+                        <div class="hedge-metric">
+                            <span class="metric-label">Coverage</span>
+                            <span class="metric-value ${coverage >= 100 ? 'full' : coverage > 0 ? 'partial' : 'none'}">${coverage}%</span>
+                        </div>
+                        <div class="hedge-metric">
+                            <span class="metric-label">Arrives</span>
+                            <span class="metric-value">T${position.arrivalTurn}</span>
+                        </div>
+                    </div>
+
+                    ${linkedFutures.length > 0 ? `
+                        <div class="linked-futures">
+                            <div class="linked-futures-header">Linked Futures</div>
+                            ${linkedFutures.map(f => `
+                                <div class="linked-future-item">
+                                    <span>${f.exchange} ${f.contract}</span>
+                                    <span>${f.direction} x${f.contracts}</span>
+                                    <span class="futures-pl ${f.unrealizedPL >= 0 ? 'profit' : 'loss'}">
+                                        $${f.unrealizedPL?.toLocaleString() || '0'}
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <div class="no-hedge-message">
+                            <span>No hedge linked</span>
+                            <button class="add-hedge-btn" onclick="HedgeStatusWidget.showAddHedgeModal('${position.id}')">
+                                + Add Hedge
+                            </button>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Get hedge status for a position
+     */
+    getHedgeStatus(position) {
+        const linkedFutures = this.getLinkedFutures(position);
+        const coverage = this.calculateCoverage(position, linkedFutures);
+
+        if (coverage >= 100) {
+            return { status: 'hedged', label: 'Fully Hedged', coverage };
+        } else if (coverage > 0) {
+            return { status: 'partial', label: `${coverage}% Hedged`, coverage };
+        } else {
+            return { status: 'exposed', label: 'Exposed', coverage };
+        }
+    },
+
+    /**
+     * Get futures positions linked to a physical position
+     */
+    getLinkedFutures(position) {
+        return GAME_STATE.futuresPositions.filter(f =>
+            f.status === 'OPEN' && f.linkedPhysicalId === position.id
+        );
+    },
+
+    /**
+     * Calculate hedge coverage percentage
+     */
+    calculateCoverage(position, linkedFutures) {
+        if (linkedFutures.length === 0) return 0;
+
+        const contractSize = 25; // 25 MT per contract
+        const totalHedged = linkedFutures.reduce((sum, f) =>
+            sum + (f.contracts * contractSize), 0
+        );
+
+        return Math.min(100, Math.round((totalHedged / position.tonnage) * 100));
+    },
+
+    /**
+     * Render empty state
+     */
+    renderEmptyState() {
+        return `
+            <div class="hedge-empty-state">
+                <div class="empty-icon">📊</div>
+                <div class="empty-title">No Physical Positions</div>
+                <div class="empty-message">
+                    Buy copper to start tracking hedge coverage
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Render arbitrage opportunities tab
+     */
+    renderArbitrage() {
+        const data = GAME_STATE.currentMonthData;
+        if (!data || !data.PRICING) {
+            return '<div class="arb-empty">No pricing data available</div>';
+        }
+
+        const lme = data.PRICING.LME;
+        const comex = data.PRICING.COMEX;
+
+        const spotSpread = comex.SPOT_AVG - lme.SPOT_AVG;
+        const spreadPct = ((spotSpread / lme.SPOT_AVG) * 100).toFixed(2);
+
+        // Calculate term structure
+        const lmeContango = ((lme.FUTURES_6M - lme.SPOT_AVG) / lme.SPOT_AVG * 100).toFixed(2);
+        const comexContango = ((comex.FUTURES_6M - comex.SPOT_AVG) / comex.SPOT_AVG * 100).toFixed(2);
+
+        return `
+            <div class="arbitrage-panel">
+                <div class="arb-section">
+                    <h4>Exchange Spread</h4>
+                    <div class="arb-metric">
+                        <span>COMEX - LME Spot</span>
+                        <span class="${spotSpread > 0 ? 'positive' : 'negative'}">
+                            ${spotSpread > 0 ? '+' : ''}$${spotSpread.toFixed(0)} (${spreadPct}%)
+                        </span>
+                    </div>
+                </div>
+
+                <div class="arb-section">
+                    <h4>Term Structure (6M)</h4>
+                    <div class="arb-metric">
+                        <span>LME Contango</span>
+                        <span>${lmeContango}%</span>
+                    </div>
+                    <div class="arb-metric">
+                        <span>COMEX Contango</span>
+                        <span>${comexContango}%</span>
+                    </div>
+                </div>
+
+                <div class="arb-section">
+                    <h4>Trading Signals</h4>
+                    ${spotSpread > 200 ? `
+                        <div class="arb-signal positive">
+                            📈 COMEX premium elevated - consider LME sourcing for COMEX delivery
+                        </div>
+                    ` : spotSpread < -100 ? `
+                        <div class="arb-signal negative">
+                            📉 COMEX discount - unusual, check market conditions
+                        </div>
+                    ` : `
+                        <div class="arb-signal neutral">
+                            ➖ Exchange spreads within normal range
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Switch between tabs
+     */
+    switchTab(tab) {
+        this.currentTab = tab;
+        this.render();
+    },
+
+    /**
+     * Show modal to add hedge
+     */
+    showAddHedgeModal(positionId) {
+        const position = GAME_STATE.physicalPositions.find(p => p.id === positionId);
+        if (!position) return;
+
+        const openFutures = GAME_STATE.futuresPositions.filter(f =>
+            f.status === 'OPEN' && !f.linkedPhysicalId
+        );
+
+        if (openFutures.length === 0) {
+            alert('No unlinked futures positions available.\n\nOpen a SHORT futures position in the Futures tab to hedge this physical position.');
+            return;
+        }
+
+        this.pendingPhysicalId = positionId;
+
+        // Show futures selection modal
+        const modal = document.getElementById('hedgeLinkModal');
+        if (modal) {
+            const listContainer = document.getElementById('availableFuturesList');
+            listContainer.innerHTML = openFutures.map(f => `
+                <div class="futures-select-item" onclick="HedgeStatusWidget.showLinkPrompt('${positionId}', '${f.id}')">
+                    <div class="futures-select-info">
+                        <span class="futures-id">${f.id}</span>
+                        <span class="futures-details">${f.exchange} ${f.contract} | ${f.direction} x${f.contracts}</span>
+                    </div>
+                    <div class="futures-select-pl ${f.unrealizedPL >= 0 ? 'profit' : 'loss'}">
+                        $${f.unrealizedPL?.toLocaleString() || '0'}
+                    </div>
+                </div>
+            `).join('');
+
+            modal.style.display = 'flex';
+        }
+    },
+
+    /**
+     * Show link confirmation prompt
+     */
+    showLinkPrompt(physicalId, futuresId) {
+        this.pendingPhysicalId = physicalId;
+        this.pendingFuturesId = futuresId;
+
+        const physical = GAME_STATE.physicalPositions.find(p => p.id === physicalId);
+        const futures = GAME_STATE.futuresPositions.find(f => f.id === futuresId);
+
+        if (confirm(`Link futures position ${futuresId} to physical position ${physicalId}?\n\nPhysical: ${physical.tonnage} MT ${physical.supplier} → ${physical.destination}\nFutures: ${futures.exchange} ${futures.contract} ${futures.direction} x${futures.contracts}`)) {
+            this.confirmLink();
+        }
+    },
+
+    /**
+     * Confirm and execute the link
+     */
+    confirmLink() {
+        if (!this.pendingPhysicalId || !this.pendingFuturesId) return;
+
+        const futures = GAME_STATE.futuresPositions.find(f => f.id === this.pendingFuturesId);
+        if (futures) {
+            futures.linkedPhysicalId = this.pendingPhysicalId;
+            console.log(`[HEDGE] Linked ${this.pendingFuturesId} to ${this.pendingPhysicalId}`);
+        }
+
+        // Close modal
+        const modal = document.getElementById('hedgeLinkModal');
+        if (modal) modal.style.display = 'none';
+
+        // Reset pending IDs
+        this.pendingPhysicalId = null;
+        this.pendingFuturesId = null;
+
+        // Re-render
+        this.render();
+        AnalyticsWidget.render();
+
+        // Notify
+        if (typeof NotificationManager !== 'undefined') {
+            NotificationManager.add('hedge-linked', 'Hedge Linked', 'Futures position linked to physical', '🛡️');
+        }
+    },
+
+    /**
+     * Close the hedge link modal
+     */
+    closeModal() {
+        const modal = document.getElementById('hedgeLinkModal');
+        if (modal) modal.style.display = 'none';
+        this.pendingPhysicalId = null;
+        this.pendingFuturesId = null;
+    }
+};
+
+
+// ============================================================
 // SECTION 11: INITIALIZATION
 // ============================================================
 
@@ -3540,6 +3943,7 @@ document.addEventListener('DOMContentLoaded', () => {
     PositionsWidget.render();
     AnalyticsWidget.render();
     BankWidget.render();
+    HedgeStatusWidget.render();
 
     // Initialize map
     MapWidget.init();

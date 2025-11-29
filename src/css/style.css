@@ -1889,3 +1889,509 @@ body {
     color: #555;
     font-style: italic;
 }
+
+/* ============================================================
+   HEDGE STATUS WIDGET
+   ============================================================ */
+
+#hedgeStatusContainer {
+    padding: 12px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Summary Bar */
+.hedge-summary-bar {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    border: 1px solid #333;
+}
+
+.hedge-summary-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.hedge-summary-item .summary-label {
+    display: block;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.hedge-summary-item .summary-value {
+    display: block;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.hedge-summary-item.hedged {
+    border-left: 3px solid #4ade80;
+}
+
+.hedge-summary-item.hedged .summary-value {
+    color: #4ade80;
+}
+
+.hedge-summary-item.exposed {
+    border-left: 3px solid #ef4444;
+}
+
+.hedge-summary-item.exposed .summary-value {
+    color: #ef4444;
+}
+
+.hedge-summary-item.partial {
+    border-left: 3px solid #fbbf24;
+}
+
+.hedge-summary-item.partial .summary-value {
+    color: #fbbf24;
+}
+
+/* Sub Tabs */
+.hedge-sub-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.hedge-sub-tab {
+    flex: 1;
+    padding: 10px 16px;
+    background: #252530;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #aaa;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.hedge-sub-tab:hover {
+    background: #303040;
+    color: #fff;
+}
+
+.hedge-sub-tab.active {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+    border-color: #3b82f6;
+}
+
+/* Hedge Cards Container */
+.hedge-cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Hedge Card */
+.hedge-card {
+    background: #1e1e28;
+    border-radius: 8px;
+    border: 1px solid #333;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.hedge-card:hover {
+    border-color: #555;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.hedge-card.hedged {
+    border-left: 4px solid #4ade80;
+}
+
+.hedge-card.exposed {
+    border-left: 4px solid #ef4444;
+}
+
+.hedge-card.partial {
+    border-left: 4px solid #fbbf24;
+}
+
+.hedge-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid #333;
+}
+
+.hedge-position-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hedge-id {
+    font-size: 12px;
+    color: #888;
+    font-family: monospace;
+}
+
+.hedge-route {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.hedge-status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.hedge-status-badge.hedged {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+}
+
+.hedge-status-badge.exposed {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.hedge-status-badge.partial {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+}
+
+.hedge-card-body {
+    padding: 12px 16px;
+}
+
+/* Hedge Metrics */
+.hedge-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.hedge-metric {
+    text-align: center;
+}
+
+.hedge-metric .metric-label {
+    display: block;
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.hedge-metric .metric-value {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.hedge-metric .metric-value.full {
+    color: #4ade80;
+}
+
+.hedge-metric .metric-value.partial {
+    color: #fbbf24;
+}
+
+.hedge-metric .metric-value.none {
+    color: #ef4444;
+}
+
+/* Linked Futures */
+.linked-futures {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+.linked-futures-header {
+    font-size: 11px;
+    color: #3b82f6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.linked-future-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 13px;
+    color: #ccc;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.linked-future-item:last-child {
+    border-bottom: none;
+}
+
+.futures-pl {
+    font-weight: 600;
+}
+
+.futures-pl.profit {
+    color: #4ade80;
+}
+
+.futures-pl.loss {
+    color: #ef4444;
+}
+
+/* No Hedge Message */
+.no-hedge-message {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px dashed rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    color: #ef4444;
+    font-size: 13px;
+}
+
+.add-hedge-btn {
+    padding: 6px 12px;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.add-hedge-btn:hover {
+    background: #2563eb;
+}
+
+/* Empty State */
+.hedge-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.hedge-empty-state .empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.hedge-empty-state .empty-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.hedge-empty-state .empty-message {
+    font-size: 14px;
+    color: #666;
+}
+
+/* Arbitrage Panel */
+.arbitrage-panel {
+    padding: 4px;
+}
+
+.arb-section {
+    background: #1e1e28;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid #333;
+}
+
+.arb-section h4 {
+    font-size: 13px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 12px 0;
+}
+
+.arb-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 14px;
+    border-bottom: 1px solid #333;
+}
+
+.arb-metric:last-child {
+    border-bottom: none;
+}
+
+.arb-metric .positive {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.arb-metric .negative {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.arb-signal {
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.arb-signal.positive {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.arb-signal.negative {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.arb-signal.neutral {
+    background: rgba(255, 255, 255, 0.05);
+    color: #888;
+    border: 1px solid #333;
+}
+
+.arb-empty {
+    text-align: center;
+    padding: 32px;
+    color: #666;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #1e1e28;
+    border-radius: 12px;
+    border: 1px solid #333;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid #333;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #fff;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-instruction {
+    color: #888;
+    font-size: 14px;
+    margin: 0 0 16px 0;
+}
+
+/* Futures Select List */
+.futures-select-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.futures-select-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #252530;
+    border: 1px solid #333;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.futures-select-item:hover {
+    background: #303040;
+    border-color: #3b82f6;
+}
+
+.futures-select-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.futures-select-info .futures-id {
+    font-size: 11px;
+    color: #666;
+    font-family: monospace;
+}
+
+.futures-select-info .futures-details {
+    font-size: 14px;
+    color: #fff;
+}
+
+.futures-select-pl {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.futures-select-pl.profit {
+    color: #4ade80;
+}
+
+.futures-select-pl.loss {
+    color: #ef4444;
+}
