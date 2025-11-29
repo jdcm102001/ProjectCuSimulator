@@ -1756,7 +1756,7 @@ const PositionsWidget = {
         const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
         const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
 
-        // Determine timeline stage
+        // Determine timeline stage - only mark completed when actually completed
         const hasSailed = currentTurn >= sailedTurn;
         const hasArrived = isArrived || isSold || currentTurn >= pos.arrivalTurn;
         const qpSettled = pos.qpRevealed === true;
@@ -1776,10 +1776,11 @@ const PositionsWidget = {
             isFullyClosed = qpSettled && saleQpSettled;
         }
 
-        // Timeline dot states
-        const purchaseDot = 'completed';
-        const sailedDot = hasSailed ? 'completed' : 'current';
-        const arrivalDot = hasArrived ? 'completed' : (hasSailed ? 'current' : '');
+        // Timeline dot states - only fill when stage is actually completed
+        // No 'current' state for unfilled dots - they should be empty until completed
+        const purchaseDot = 'completed'; // Purchase is always completed (position exists)
+        const sailedDot = hasSailed ? 'completed' : '';
+        const arrivalDot = hasArrived ? 'completed' : '';
         const qpDot = qpSettled ? 'completed' : '';
 
         // Labels
@@ -2430,10 +2431,12 @@ const AnalyticsWidget = {
                 ? (monthData.PRICING.COMEX?.SPOT_AVG || 0)
                 : (monthData.PRICING.LME?.SPOT_AVG || 0);
 
-            const regionalPremium = sale.regionalPremium || 0;
-            const estimatedPrice = currentSpot + regionalPremium;
+            // Use correct field names from sale record: 'premium' not 'regionalPremium'
+            const salePremium = sale.premium || 0;
+            const estimatedPrice = currentSpot + salePremium;
             const estimatedRevenue = (sale.tonnage || 0) * estimatedPrice;
-            const cost = sale.originalCost || (sale.tonnage * (sale.costPerMT || 0));
+            // Use correct field names: 'costBasis' and 'pricePerMT' not 'originalCost' and 'costPerMT'
+            const cost = sale.costBasis || (sale.tonnage * (sale.pricePerMT || 0));
 
             unrealizedPnL += (estimatedRevenue - cost);
         });
