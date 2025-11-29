@@ -3641,18 +3641,16 @@ const HedgeStatusWidget = {
         const coverage = this.calculateCoverage(position, linkedFutures);
 
         const statusClass = hedgeStatus.status;
-        const statusIcon = hedgeStatus.status === 'hedged' ? '🛡️' :
-                          hedgeStatus.status === 'partial' ? '⚠️' : '🔓';
 
         return `
             <div class="hedge-card ${statusClass}">
                 <div class="hedge-card-header">
                     <div class="hedge-position-info">
                         <span class="hedge-id">${position.id}</span>
-                        <span class="hedge-route">${position.supplier} → ${position.destination}</span>
+                        <span class="hedge-route">${position.supplier} > ${position.destination}</span>
                     </div>
                     <div class="hedge-status-badge ${statusClass}">
-                        ${statusIcon} ${hedgeStatus.label}
+                        ${hedgeStatus.label.toUpperCase()}
                     </div>
                 </div>
 
@@ -3747,7 +3745,7 @@ const HedgeStatusWidget = {
     renderEmptyState() {
         return `
             <div class="hedge-empty-state">
-                <div class="empty-icon">📊</div>
+                <div class="empty-icon">--</div>
                 <div class="empty-title">No Physical Positions</div>
                 <div class="empty-message">
                     Buy copper to start tracking hedge coverage
@@ -3803,15 +3801,15 @@ const HedgeStatusWidget = {
                     <h4>Trading Signals</h4>
                     ${spotSpread > 200 ? `
                         <div class="arb-signal positive">
-                            📈 COMEX premium elevated - consider LME sourcing for COMEX delivery
+                            [+] COMEX premium elevated - consider LME sourcing for COMEX delivery
                         </div>
                     ` : spotSpread < -100 ? `
                         <div class="arb-signal negative">
-                            📉 COMEX discount - unusual, check market conditions
+                            [-] COMEX discount - unusual, check market conditions
                         </div>
                     ` : `
                         <div class="arb-signal neutral">
-                            ➖ Exchange spreads within normal range
+                            [=] Exchange spreads within normal range
                         </div>
                     `}
                 </div>

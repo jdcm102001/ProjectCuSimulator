@@ -1891,145 +1891,141 @@ body {
 }
 
 /* ============================================================
-   HEDGE STATUS WIDGET
+   HEDGE STATUS WIDGET - Bloomberg Terminal Style
    ============================================================ */
 
 #hedgeStatusContainer {
-    padding: 12px;
+    padding: 10px;
     height: 100%;
     overflow-y: auto;
 }
 
-/* Summary Bar */
+/* Summary Bar - Matches Analytics card style */
 .hedge-summary-bar {
     display: flex;
-    gap: 12px;
-    padding: 12px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border-radius: 8px;
-    margin-bottom: 12px;
-    border: 1px solid #333;
+    gap: 8px;
+    padding: 10px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    margin-bottom: 10px;
 }
 
 .hedge-summary-item {
     flex: 1;
     text-align: center;
-    padding: 8px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 8px;
+    background: #1a1a1a;
+    border: 1px solid #333;
 }
 
 .hedge-summary-item .summary-label {
     display: block;
-    font-size: 11px;
-    color: #888;
+    font-size: 10px;
+    color: #666;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     margin-bottom: 4px;
 }
 
 .hedge-summary-item .summary-value {
     display: block;
-    font-size: 18px;
-    font-weight: 700;
-    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e0;
 }
 
 .hedge-summary-item.hedged {
-    border-left: 3px solid #4ade80;
+    border-left: 3px solid #4CAF50;
 }
 
 .hedge-summary-item.hedged .summary-value {
-    color: #4ade80;
+    color: #4CAF50;
 }
 
 .hedge-summary-item.exposed {
-    border-left: 3px solid #ef4444;
+    border-left: 3px solid #f44336;
 }
 
 .hedge-summary-item.exposed .summary-value {
-    color: #ef4444;
+    color: #f44336;
 }
 
 .hedge-summary-item.partial {
-    border-left: 3px solid #fbbf24;
+    border-left: 3px solid #ff9800;
 }
 
 .hedge-summary-item.partial .summary-value {
-    color: #fbbf24;
+    color: #ff9800;
 }
 
-/* Sub Tabs */
+/* Sub Tabs - Matches .tab button style */
 .hedge-sub-tabs {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 4px;
+    margin-bottom: 10px;
 }
 
 .hedge-sub-tab {
     flex: 1;
-    padding: 10px 16px;
-    background: #252530;
-    border: 1px solid #333;
-    border-radius: 6px;
-    color: #aaa;
+    padding: 5px 12px;
+    background: #333;
+    border: 1px solid #444;
+    color: #888;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 13px;
-    font-weight: 500;
+    font-family: inherit;
+    font-size: 11px;
+    transition: all 0.15s ease;
 }
 
 .hedge-sub-tab:hover {
-    background: #303040;
-    color: #fff;
+    background: #3a3a3a;
+    color: #aaa;
 }
 
 .hedge-sub-tab.active {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: #444;
     color: #fff;
-    border-color: #3b82f6;
+    border-color: #666;
 }
 
 /* Hedge Cards Container */
 .hedge-cards-container {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
-/* Hedge Card */
+/* Hedge Card - Matches .position-card style */
 .hedge-card {
-    background: #1e1e28;
-    border-radius: 8px;
-    border: 1px solid #333;
-    overflow: hidden;
-    transition: all 0.2s ease;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    padding: 0;
 }
 
 .hedge-card:hover {
     border-color: #555;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .hedge-card.hedged {
-    border-left: 4px solid #4ade80;
+    border-left: 3px solid #4CAF50;
 }
 
 .hedge-card.exposed {
-    border-left: 4px solid #ef4444;
+    border-left: 3px solid #f44336;
 }
 
 .hedge-card.partial {
-    border-left: 4px solid #fbbf24;
+    border-left: 3px solid #ff9800;
 }
 
 .hedge-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border-bottom: 1px solid #333;
+    padding: 10px 12px;
+    background: #333;
+    border-bottom: 1px solid #444;
 }
 
 .hedge-position-info {
@@ -2039,58 +2035,64 @@ body {
 }
 
 .hedge-id {
-    font-size: 12px;
-    color: #888;
-    font-family: monospace;
+    font-size: 10px;
+    color: #666;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .hedge-route {
-    font-size: 14px;
-    font-weight: 600;
-    color: #fff;
-}
-
-.hedge-status-badge {
-    padding: 6px 12px;
-    border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
+    color: #e0e0e0;
+}
+
+/* Status Badge - Matches .status-badge pattern */
+.hedge-status-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+    background: #333;
+    border: 1px solid #666;
 }
 
 .hedge-status-badge.hedged {
-    background: rgba(74, 222, 128, 0.15);
-    color: #4ade80;
+    color: #4CAF50;
+    border-color: #4CAF50;
 }
 
 .hedge-status-badge.exposed {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    color: #f44336;
+    border-color: #f44336;
 }
 
 .hedge-status-badge.partial {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
+    color: #ff9800;
+    border-color: #ff9800;
 }
 
 .hedge-card-body {
-    padding: 12px 16px;
+    padding: 10px 12px;
 }
 
-/* Hedge Metrics */
+/* Hedge Metrics - Analytics style */
 .hedge-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
 }
 
 .hedge-metric {
     text-align: center;
+    flex: 1;
 }
 
 .hedge-metric .metric-label {
     display: block;
-    font-size: 11px;
+    font-size: 10px;
     color: #666;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -2099,48 +2101,50 @@ body {
 
 .hedge-metric .metric-value {
     display: block;
-    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
     font-weight: 600;
-    color: #fff;
+    color: #e0e0e0;
 }
 
 .hedge-metric .metric-value.full {
-    color: #4ade80;
+    color: #4CAF50;
 }
 
 .hedge-metric .metric-value.partial {
-    color: #fbbf24;
+    color: #ff9800;
 }
 
 .hedge-metric .metric-value.none {
-    color: #ef4444;
+    color: #f44336;
 }
 
 /* Linked Futures */
 .linked-futures {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    border-radius: 6px;
-    padding: 10px 12px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 8px 10px;
 }
 
 .linked-futures-header {
-    font-size: 11px;
-    color: #3b82f6;
+    font-size: 10px;
+    color: #666;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #333;
 }
 
 .linked-future-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 0;
-    font-size: 13px;
-    color: #ccc;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 4px 0;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    color: #aaa;
+    border-bottom: 1px solid #2a2a2a;
 }
 
 .linked-future-item:last-child {
@@ -2152,11 +2156,11 @@ body {
 }
 
 .futures-pl.profit {
-    color: #4ade80;
+    color: #4CAF50;
 }
 
 .futures-pl.loss {
-    color: #ef4444;
+    color: #f44336;
 }
 
 /* No Hedge Message */
@@ -2164,28 +2168,28 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px dashed rgba(239, 68, 68, 0.3);
-    border-radius: 6px;
-    color: #ef4444;
-    font-size: 13px;
+    padding: 10px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-left: 3px solid #f44336;
+    color: #888;
+    font-size: 11px;
 }
 
 .add-hedge-btn {
-    padding: 6px 12px;
-    background: #3b82f6;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
+    padding: 4px 10px;
+    background: #333;
+    color: #2196F3;
+    border: 1px solid #2196F3;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 600;
-    transition: background 0.2s;
+    transition: all 0.15s ease;
 }
 
 .add-hedge-btn:hover {
-    background: #2563eb;
+    background: #2196F3;
+    color: #fff;
 }
 
 /* Empty State */
@@ -2194,55 +2198,61 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 40px 20px;
     text-align: center;
+    background: #1a1a1a;
+    border: 1px solid #333;
 }
 
 .hedge-empty-state .empty-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.4;
 }
 
 .hedge-empty-state .empty-title {
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 600;
-    color: #888;
-    margin-bottom: 8px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
 }
 
 .hedge-empty-state .empty-message {
-    font-size: 14px;
-    color: #666;
+    font-size: 11px;
+    color: #555;
 }
 
 /* Arbitrage Panel */
 .arbitrage-panel {
-    padding: 4px;
+    padding: 0;
 }
 
 .arb-section {
-    background: #1e1e28;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
-    border: 1px solid #333;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    padding: 12px;
+    margin-bottom: 10px;
 }
 
 .arb-section h4 {
-    font-size: 13px;
-    color: #888;
+    font-size: 10px;
+    color: #666;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 0 0 12px 0;
+    letter-spacing: 1px;
+    margin: 0 0 10px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
 }
 
 .arb-metric {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
-    font-size: 14px;
+    padding: 6px 0;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
     border-bottom: 1px solid #333;
 }
 
@@ -2251,43 +2261,42 @@ body {
 }
 
 .arb-metric .positive {
-    color: #4ade80;
+    color: #4CAF50;
     font-weight: 600;
 }
 
 .arb-metric .negative {
-    color: #ef4444;
+    color: #f44336;
     font-weight: 600;
 }
 
 .arb-signal {
-    padding: 12px;
-    border-radius: 6px;
-    font-size: 13px;
+    padding: 10px;
+    font-size: 11px;
+    background: #1a1a1a;
+    border: 1px solid #333;
 }
 
 .arb-signal.positive {
-    background: rgba(74, 222, 128, 0.1);
-    color: #4ade80;
-    border: 1px solid rgba(74, 222, 128, 0.2);
+    border-left: 3px solid #4CAF50;
+    color: #4CAF50;
 }
 
 .arb-signal.negative {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-left: 3px solid #f44336;
+    color: #f44336;
 }
 
 .arb-signal.neutral {
-    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid #666;
     color: #888;
-    border: 1px solid #333;
 }
 
 .arb-empty {
     text-align: center;
-    padding: 32px;
-    color: #666;
+    padding: 24px;
+    color: #555;
+    font-size: 11px;
 }
 
 /* Modal Overlay */
