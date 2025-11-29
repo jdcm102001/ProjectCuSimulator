@@ -64,6 +64,7 @@
                 <li data-widget="Futures">Futures</li>
                 <li data-widget="Map">Active Map</li>
                 <li data-widget="Analytics">Analytics</li>
+                <li data-widget="HedgeStatus">Hedge Status</li>
             </ul>
         </aside>
 
@@ -106,17 +107,19 @@
                 </div>
             </div>
 
-            <!-- Panel 4: Analytics -->
+            <!-- Panel 4: Analytics + Hedge Status -->
             <div class="panel" id="panel4">
                 <div class="panel-header">
                     <div class="tabs">
                         <button class="tab active" data-widget="Analytics">Analytics</button>
+                        <button class="tab" data-widget="HedgeStatus">Hedge Status</button>
                     </div>
                 </div>
                 <div class="panel-content" id="content4">
                     <div id="analyticsContainer">
                         <canvas id="futuresChart"></canvas>
                     </div>
+                    <div id="hedgeStatusContainer" style="display:none;"></div>
                 </div>
             </div>
         </main>
@@ -282,6 +285,37 @@
                 </div>
             </div>
             <button id="executeFuturesBtn" onclick="FuturesWidget.execute()">OPEN POSITION</button>
+        </div>
+    </div>
+
+    <!-- Hedge Link Modal -->
+    <div id="hedgeLinkModal" class="modal-backdrop" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">Link as Hedge?</div>
+            <div class="modal-body">
+                <p>Connect this futures position to your physical cargo?</p>
+                <div class="link-preview">
+                    <div class="row">
+                        <span class="label">Physical:</span>
+                        <span id="modalPhysicalDetails">—</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Pricing:</span>
+                        <span id="modalPricing">—</span>
+                    </div>
+                </div>
+                <div class="link-arrow">↓ Link to ↓</div>
+                <div class="link-preview">
+                    <div class="row">
+                        <span class="label">Futures:</span>
+                        <span id="modalFuturesDetails">—</span>
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button class="modal-btn" onclick="HedgeStatusWidget.confirmLink()">Yes, Link</button>
+                    <button class="modal-btn cancel" onclick="document.getElementById('hedgeLinkModal').style.display='none'">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
