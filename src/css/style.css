@@ -587,3 +587,472 @@ body {
 ::-webkit-scrollbar-thumb {
     background: #444;
 }
+
+/* ============ HEDGE STATUS WIDGET ============ */
+
+/* Summary Bar */
+.summary-bar {
+    display: flex;
+    justify-content: space-between;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+}
+
+.summary-bar .summary-item {
+    text-align: center;
+}
+
+.summary-bar .summary-item .value {
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.summary-bar .summary-item .label {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+/* Sub Tabs */
+.sub-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.sub-tab {
+    flex: 1;
+    padding: 8px;
+    background: #333;
+    border: 1px solid #444;
+    color: #888;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    text-align: center;
+}
+
+.sub-tab.active {
+    background: #444;
+    color: #fff;
+    border-color: #666;
+}
+
+.sub-tab:hover {
+    border-color: #666;
+}
+
+/* Hedge Content Container */
+.hedge-content {
+    max-height: calc(100% - 100px);
+    overflow-y: auto;
+}
+
+/* Hedge Cards */
+.hedge-card {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    margin-bottom: 10px;
+    padding: 12px;
+}
+
+.hedge-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+}
+
+.hedge-card .card-header.hedged {
+    border-bottom-color: #4CAF50;
+}
+
+.hedge-card .card-header.exposed {
+    border-bottom-color: #f44336;
+}
+
+.hedge-card .card-header.partial {
+    border-bottom-color: #ff9800;
+}
+
+.hedge-card .card-header.arb {
+    border-bottom-color: #2196F3;
+}
+
+.hedge-card .card-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.hedge-card .card-subtitle {
+    font-size: 10px;
+    color: #888;
+    margin-top: 2px;
+}
+
+/* Status Badge for Hedge */
+.status-badge.hedged {
+    color: #4CAF50;
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.status-badge.exposed {
+    color: #f44336;
+    border-color: #f44336;
+    background: rgba(244, 67, 54, 0.1);
+}
+
+.status-badge.partial {
+    color: #ff9800;
+    border-color: #ff9800;
+    background: rgba(255, 152, 0, 0.1);
+}
+
+.status-badge.arb {
+    color: #2196F3;
+    border-color: #2196F3;
+    background: rgba(33, 150, 243, 0.1);
+}
+
+/* Price Row */
+.price-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #333;
+    border: 1px solid #444;
+}
+
+.price-row .price-item {
+    flex: 1;
+}
+
+.price-row .price-item .label {
+    font-size: 9px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.price-row .price-item .value {
+    font-size: 12px;
+    color: #fff;
+    font-weight: bold;
+}
+
+.price-row .price-arrow {
+    color: #666;
+    font-size: 14px;
+}
+
+.price-row .protection {
+    text-align: right;
+}
+
+.price-row .protection .value.full {
+    color: #4CAF50;
+}
+
+.price-row .protection .value.none {
+    color: #f44336;
+}
+
+.price-row .protection .value.partial {
+    color: #ff9800;
+}
+
+/* Live Price Indicator */
+.live-price {
+    font-size: 10px;
+    color: #888;
+    padding: 6px 8px;
+    background: #252525;
+    border: 1px solid #333;
+    margin-bottom: 8px;
+}
+
+.live-price .current {
+    color: #fff;
+    font-weight: bold;
+}
+
+/* Results Row */
+.results-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #333;
+    border: 1px solid #444;
+}
+
+.results-row .result-item {
+    flex: 1;
+    text-align: center;
+}
+
+.results-row .result-item .label {
+    font-size: 9px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.results-row .result-item .value {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.results-row .result-item.total {
+    border-left: 1px solid #444;
+    padding-left: 10px;
+}
+
+/* Insight Box */
+.insight {
+    font-size: 10px;
+    padding: 8px;
+    background: #252525;
+    border-left: 3px solid #666;
+    margin-bottom: 8px;
+    color: #888;
+}
+
+.insight.success {
+    border-left-color: #4CAF50;
+}
+
+.insight.danger {
+    border-left-color: #f44336;
+}
+
+.insight.warning {
+    border-left-color: #ff9800;
+}
+
+/* Action Button */
+.action-btn {
+    width: 100%;
+    padding: 8px;
+    background: #333;
+    border: 1px dashed #666;
+    color: #888;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    margin-bottom: 8px;
+}
+
+.action-btn:hover {
+    border-color: #4CAF50;
+    color: #4CAF50;
+}
+
+/* Open Indicator */
+.open-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: #888;
+}
+
+.open-indicator .dot {
+    width: 6px;
+    height: 6px;
+    background: #4CAF50;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Spread Row for Arbitrage */
+.spread-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #333;
+    border: 1px solid #444;
+}
+
+.spread-row .exchange-box {
+    flex: 1;
+    padding: 6px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+}
+
+.spread-row .exchange-tag {
+    font-size: 9px;
+    padding: 2px 6px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.spread-row .exchange-tag.lme {
+    background: #2196F3;
+    color: #fff;
+}
+
+.spread-row .exchange-tag.comex {
+    background: #ff9800;
+    color: #000;
+}
+
+.spread-row .spread-box {
+    text-align: center;
+    padding: 6px;
+}
+
+.spread-row .spread-box .target {
+    font-size: 9px;
+    color: #666;
+}
+
+/* Empty State for Hedge Widget */
+.hedge-content .empty-state {
+    padding: 30px;
+}
+
+.hedge-content .empty-state .icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.hedge-content .empty-state .title {
+    font-size: 14px;
+    color: #fff;
+    margin-bottom: 5px;
+}
+
+.hedge-content .empty-state .subtitle {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 15px;
+}
+
+.hedge-content .empty-state .btn {
+    padding: 8px 16px;
+    background: #333;
+    border: 1px solid #4CAF50;
+    color: #4CAF50;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+}
+
+.hedge-content .empty-state .btn:hover {
+    background: #4CAF50;
+    color: #000;
+}
+
+/* ============ HEDGE LINK MODAL ============ */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal {
+    background: #252525;
+    border: 2px solid #4CAF50;
+    width: 350px;
+    max-width: 90%;
+}
+
+.modal-header {
+    padding: 12px 15px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #444;
+    color: #4CAF50;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.modal-body {
+    padding: 15px;
+}
+
+.modal-body p {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 15px;
+}
+
+.link-preview {
+    background: #333;
+    border: 1px solid #444;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.link-preview .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 11px;
+}
+
+.link-preview .row .label {
+    color: #888;
+}
+
+.link-arrow {
+    text-align: center;
+    color: #4CAF50;
+    font-size: 12px;
+    padding: 8px 0;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.modal-btn {
+    flex: 1;
+    padding: 10px;
+    background: #333;
+    border: 1px solid #4CAF50;
+    color: #4CAF50;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.modal-btn:hover {
+    background: #4CAF50;
+    color: #000;
+}
+
+.modal-btn.cancel {
+    border-color: #666;
+    color: #888;
+}
+
+.modal-btn.cancel:hover {
+    background: #444;
+    color: #fff;
+}
