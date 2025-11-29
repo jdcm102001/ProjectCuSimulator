@@ -409,11 +409,8 @@ const TimeManager = {
 // ============================================================
 
 const GAME_STATE = {
-    // Finances
+    // Finances (cash-only, no LOC)
     practiceFunds: 200000,
-    lineOfCredit: 200000,
-    locUsed: 0,
-    locInterestRate: 0.0036, // 0.36% monthly
 
     // Positions
     physicalPositions: [],
@@ -422,7 +419,6 @@ const GAME_STATE = {
     // Tracking
     totalPL: 0,
     inventory: 0,
-    totalInterestPaid: 0,
 
     // Monthly Purchase Limits (MT) - reset at month boundaries
     monthlyPurchaseLimits: {
@@ -488,12 +484,11 @@ const GAME_STATE = {
             // Load all month data from ScenarioLoader
             this.allMonthData = ScenarioLoader.getAllMonthData();
 
-            // Apply scenario settings
+            // Apply scenario settings (cash-only)
             const settings = ScenarioLoader.getSettings();
             if (settings) {
-                this.cash = settings.startingFunds || 200000;
-                this.locLimit = settings.locLimit || 200000;
-                console.log('[GAME] Applied settings - Cash:', this.cash, 'LOC:', this.locLimit);
+                this.practiceFunds = settings.startingFunds || 200000;
+                console.log('[GAME] Applied settings - Funds:', this.practiceFunds);
             }
         } else {
             // Fallback: Load from global variables (default behavior)
@@ -580,44 +575,22 @@ const GAME_STATE = {
     },
 
     /**
-     * Update header displays
+     * Update displays (sidebar metrics)
      */
     updateHeader() {
-        // Period - using TimeManager
-        document.getElementById('headerPeriod').textContent = TimeManager.getDisplayString();
+        // Update sidebar metrics
+        const periodEl = document.getElementById('sidebarPeriod');
+        const fundsEl = document.getElementById('sidebarFunds');
+        const plEl = document.getElementById('sidebarPL');
+        const inventoryEl = document.getElementById('sidebarInventory');
 
-        // Funds
-        document.getElementById('headerFunds').textContent = this.formatCurrency(this.practiceFunds);
-
-        // P&L
-        const plEl = document.getElementById('headerPL');
-        plEl.textContent = this.formatCurrency(this.totalPL);
-        plEl.className = this.totalPL >= 0 ? 'value positive' : 'value negative';
-
-        // Buying Power (Funds + Available LOC)
-        const availableLOC = this.lineOfCredit - this.locUsed;
-        const buyingPower = this.practiceFunds + availableLOC;
-        document.getElementById('headerBuyingPower').textContent = this.formatCurrency(buyingPower);
-
-        // Inventory
-        document.getElementById('headerInventory').textContent = `${this.inventory} MT`;
-
-        // LOC
-        document.getElementById('headerLOC').textContent =
-            `${this.formatCurrency(this.locUsed)} / $200K`;
-
-        // QP Pending indicator
-        const pendingQP = this.salesPendingQP || [];
-        const qpMetric = document.getElementById('headerQPMetric');
-        const qpPending = document.getElementById('headerQPPending');
-        if (qpMetric && qpPending) {
-            if (pendingQP.length > 0) {
-                qpMetric.style.display = 'flex';
-                qpPending.textContent = `${pendingQP.length} sale${pendingQP.length > 1 ? 's' : ''}`;
-            } else {
-                qpMetric.style.display = 'none';
-            }
+        if (periodEl) periodEl.textContent = TimeManager.getDisplayString();
+        if (fundsEl) fundsEl.textContent = this.formatCurrency(this.practiceFunds);
+        if (plEl) {
+            plEl.textContent = this.formatCurrency(this.totalPL);
+            plEl.className = 'metric-value ' + (this.totalPL >= 0 ? 'positive' : 'negative');
         }
+        if (inventoryEl) inventoryEl.textContent = `${this.inventory} MT`;
     },
 
     /**
@@ -653,9 +626,6 @@ const GAME_STATE = {
             this.updateCurrentMonthData();
             console.log('[GAME] New month:', result.details.monthName);
 
-            // Charge LOC interest at month boundaries
-            this.chargeLOCInterest();
-
             // Reset monthly purchase/sales limits
             this.resetMonthlyLimits();
 
@@ -679,7 +649,6 @@ const GAME_STATE = {
         FuturesWidget.render();
         AnalyticsWidget.render();
         HedgeStatusWidget.render();
-        if (typeof BankWidget !== 'undefined') BankWidget.render();
 
         console.log('[GAME] Now on Turn', TimeManager.currentTurn, '-', result.details.monthName, result.details.periodName);
 
@@ -689,33 +658,6 @@ const GAME_STATE = {
         // Update debug panels
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
         if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-    },
-
-    /**
-     * Charge LOC interest at month boundaries
-     */
-    chargeLOCInterest() {
-        if (this.locUsed <= 0) return;
-
-        const interest = Math.round(this.locUsed * this.locInterestRate);
-        this.locUsed += interest;
-        this.totalInterestPaid += interest;
-
-        const monthName = TimeManager.getMonthPeriod().monthName;
-        console.log(`[GAME] LOC Interest charged: $${interest.toLocaleString()}`);
-
-        // Send interest notification
-        NotificationManager.add(
-            'interest',
-            'Monthly Interest Charged',
-            `LOC interest of $${interest.toLocaleString()} has been charged for ${monthName}.`,
-            '🏦'
-        );
-
-        // Check if LOC exceeded limit
-        if (this.locUsed > this.lineOfCredit) {
-            alert(`Warning: LOC exceeded! Used: $${this.locUsed.toLocaleString()} / Limit: $${this.lineOfCredit.toLocaleString()}`);
-        }
     },
 
     /**
@@ -812,14 +754,8 @@ const GAME_STATE = {
                 // Cost increase = we owe more = deduct from funds
                 // Cost decrease = we overpaid = refund to funds
                 if (costAdjustment > 0) {
-                    // Cost went up - deduct additional from funds/LOC
-                    if (costAdjustment <= this.practiceFunds) {
-                        this.practiceFunds -= costAdjustment;
-                    } else {
-                        const fromLOC = costAdjustment - this.practiceFunds;
-                        this.practiceFunds = 0;
-                        this.locUsed += fromLOC;
-                    }
+                    // Cost went up - deduct additional from funds
+                    this.practiceFunds -= costAdjustment;
                 } else {
                     // Cost went down - refund to funds
                     this.practiceFunds += Math.abs(costAdjustment);
@@ -1059,9 +995,8 @@ const GAME_STATE = {
         const provisionalPricePerMT = provisionalBasePrice + premium + freight;
         const provisionalTotalCost = provisionalPricePerMT * tonnage;
 
-        // Check funds (based on provisional cost)
-        const availableFunds = this.practiceFunds + (this.lineOfCredit - this.locUsed);
-        if (provisionalTotalCost > availableFunds) {
+        // Check funds (cash-only)
+        if (provisionalTotalCost > this.practiceFunds) {
             alert('Insufficient funds!');
             return false;
         }
@@ -1069,14 +1004,8 @@ const GAME_STATE = {
         // Update monthly purchase limit
         this.monthlyPurchaseLimits[portKey].used += tonnage;
 
-        // Deduct provisional funds
-        if (provisionalTotalCost <= this.practiceFunds) {
-            this.practiceFunds -= provisionalTotalCost;
-        } else {
-            const fromLOC = provisionalTotalCost - this.practiceFunds;
-            this.practiceFunds = 0;
-            this.locUsed += fromLOC;
-        }
+        // Deduct funds
+        this.practiceFunds -= provisionalTotalCost;
 
         // Calculate travel time using TimeManager
         const travelDays = destData.TRAVEL_TIME_DAYS;
@@ -1333,6 +1262,7 @@ const GAME_STATE = {
 
     /**
      * Open futures position
+     * Flat $25 fee per contract, no margin required
      */
     openFutures(exchange, contract, direction, contracts) {
         console.log('[FUTURES] Opening', direction, contracts, 'contracts on', exchange, contract);
@@ -1341,20 +1271,17 @@ const GAME_STATE = {
         const price = exchange === 'LME' ?
             data.PRICING.LME[contract] : data.PRICING.COMEX[contract];
 
-        const marginPerContract = 9000;
         const feePerContract = 25;
-        const totalMargin = marginPerContract * contracts;
         const totalFees = feePerContract * contracts;
-        const totalDeducted = totalMargin + totalFees;
 
-        // Check funds
-        if (totalDeducted > this.practiceFunds) {
-            alert('Insufficient funds for margin!');
+        // Check funds for fee
+        if (totalFees > this.practiceFunds) {
+            alert('Insufficient funds for fees!');
             return false;
         }
 
-        // Deduct margin
-        this.practiceFunds -= totalDeducted;
+        // Deduct fee only (no margin)
+        this.practiceFunds -= totalFees;
 
         // Get current time info
         const timeInfo = TimeManager.getMonthPeriod();
@@ -1367,7 +1294,6 @@ const GAME_STATE = {
             direction: direction,
             contracts: contracts,
             entryPrice: price,
-            margin: totalMargin,
             fees: totalFees,
             openTurn: TimeManager.currentTurn,
             openMonth: timeInfo.monthName,
@@ -1394,6 +1320,7 @@ const GAME_STATE = {
 
     /**
      * Close futures position
+     * Returns P&L only (no margin to return)
      */
     closeFutures(positionId) {
         const position = this.futuresPositions.find(p => p.id === positionId);
@@ -1405,14 +1332,14 @@ const GAME_STATE = {
             data.PRICING.COMEX[position.contract];
 
         // Calculate P&L
-        const contractSize = position.exchange === 'LME' ? 25 : 25; // 25 MT per contract
+        const contractSize = 25; // 25 MT per contract
         const priceDiff = position.direction === 'LONG' ?
             currentPrice - position.entryPrice :
             position.entryPrice - currentPrice;
         const pl = priceDiff * contractSize * position.contracts;
 
-        // Return margin + P&L
-        this.practiceFunds += position.margin + pl;
+        // Return P&L only (no margin was held)
+        this.practiceFunds += pl;
         this.totalPL += pl;
 
         position.status = 'CLOSED';
@@ -1698,7 +1625,7 @@ const PositionsWidget = {
     },
 
     /**
-     * Render the positions widget
+     * Render the positions widget - Physical positions only
      */
     render() {
         const container = document.getElementById('content2');
@@ -1710,127 +1637,25 @@ const PositionsWidget = {
 
         let html = '';
 
-        // Physical positions
-        html += '<div class="markets-section">';
-        html += '<h4>PHYSICAL POSITIONS</h4>';
+        // Physical positions - show ALL including SOLD (until QP settles)
+        html += '<div class="positions-container">';
 
-        const physPositions = GAME_STATE.physicalPositions.filter(p => p.status !== 'SOLD');
+        // Show all positions - open positions first, then sold/settled
+        const allPositions = GAME_STATE.physicalPositions;
+        const openPositions = allPositions.filter(p => p.status !== 'SOLD');
+        const soldPositions = allPositions.filter(p => p.status === 'SOLD');
 
-        if (physPositions.length === 0) {
+        if (allPositions.length === 0) {
             html += '<div class="empty-state">No physical positions</div>';
         } else {
-            physPositions.forEach(pos => {
+            // Render open positions first
+            openPositions.forEach(pos => {
                 html += this.renderPositionCard(pos);
             });
-        }
-        html += '</div>';
-
-        // Purchases Pending QP
-        const pendingPurchases = GAME_STATE.purchasesPendingQP || [];
-        if (pendingPurchases.length > 0) {
-            html += '<div class="markets-section">';
-            html += '<h4>PURCHASES PENDING QP REVEAL</h4>';
-            pendingPurchases.forEach(purchase => {
-                const qpMonth = TimeManager.MONTHS[purchase.qpMonthIndex] || 'N/A';
-                const revealMonth = TimeManager.MONTHS[purchase.qpMonthIndex + 1] || 'N/A';
-                html += `
-                    <div class="position-card pending-qp purchase">
-                        <div class="position-header">
-                            <span class="position-id">${purchase.id || purchase.positionId}</span>
-                            <span class="status-badge pending">PENDING QP</span>
-                        </div>
-                        <div class="position-details">
-                            <div class="detail-row">
-                                <span class="label">Purchased:</span>
-                                <span>${purchase.tonnage} MT from ${purchase.supplier}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">QP Reveals:</span>
-                                <span class="highlight">${revealMonth} Early (${qpMonth} avg)</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Prov. Base:</span>
-                                <span>$${purchase.provisionalBasePrice?.toLocaleString()}/MT</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Premium (Fixed):</span>
-                                <span>$${purchase.premium?.toLocaleString()}/MT</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Prov. Total:</span>
-                                <span>$${purchase.totalCost?.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
+            // Then sold positions
+            soldPositions.forEach(pos => {
+                html += this.renderPositionCard(pos);
             });
-            html += '</div>';
-        }
-
-        // Sales Pending QP
-        const pendingQP = GAME_STATE.salesPendingQP || [];
-        if (pendingQP.length > 0) {
-            html += '<div class="markets-section">';
-            html += '<h4>SALES PENDING QP REVEAL</h4>';
-            pendingQP.forEach(sale => {
-                const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
-                const revealMonth = TimeManager.MONTHS[sale.qpMonthIndex + 1] || 'N/A';
-                html += `
-                    <div class="position-card pending-qp sale">
-                        <div class="position-header">
-                            <span class="position-id">${sale.id}</span>
-                            <span class="status-badge pending">PENDING QP</span>
-                        </div>
-                        <div class="position-details">
-                            <div class="detail-row">
-                                <span class="label">Sold:</span>
-                                <span>${sale.tonnage} MT to ${sale.buyer}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">QP Reveals:</span>
-                                <span class="highlight">${revealMonth} Early (${qpMonth} avg)</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Est. Revenue:</span>
-                                <span>$${sale.estimatedRevenue?.toLocaleString()}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Est. Profit:</span>
-                                <span class="${sale.estimatedProfit >= 0 ? 'positive' : 'negative'}">$${sale.estimatedProfit?.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-        }
-
-        // Futures positions
-        html += '<div class="markets-section">';
-        html += '<h4>FUTURES POSITIONS</h4>';
-
-        const futPositions = GAME_STATE.futuresPositions.filter(p => p.status === 'OPEN');
-
-        if (futPositions.length === 0) {
-            html += '<div class="empty-state">No open futures</div>';
-        } else {
-            html += '<table class="positions-table">';
-            html += '<tr><th>Contract</th><th>Dir</th><th>Qty</th><th>Entry</th><th>P&L</th><th></th></tr>';
-
-            futPositions.forEach(pos => {
-                const plClass = pos.unrealizedPL >= 0 ? 'positive' : 'negative';
-                html += `
-                    <tr>
-                        <td>${pos.exchange} ${pos.contract}</td>
-                        <td>${pos.direction}</td>
-                        <td>${pos.contracts}</td>
-                        <td>$${pos.entryPrice}</td>
-                        <td class="${plClass}">$${pos.unrealizedPL.toLocaleString()}</td>
-                        <td><button class="trade-btn sell" onclick="GAME_STATE.closeFutures('${pos.id}')">CLOSE</button></td>
-                    </tr>
-                `;
-            });
-            html += '</table>';
         }
         html += '</div>';
 
@@ -1838,154 +1663,218 @@ const PositionsWidget = {
     },
 
     /**
-     * Render a single position card with full details
+     * Render a single position card with timeline layout
      */
     renderPositionCard(pos) {
         const isInTransit = pos.status === 'IN_TRANSIT';
         const isArrived = pos.status === 'ARRIVED';
+        const isSold = pos.status === 'SOLD';
+        const currentTurn = TimeManager.currentTurn;
 
-        let statusHtml = '';
-        let locationHtml = '';
-        let actionHtml = '';
+        // Get timing info
+        const purchaseInfo = TimeManager.getMonthPeriod(pos.purchaseTurn);
+        const sailedTurn = pos.purchaseTurn + 1;
+        const sailedInfo = TimeManager.getMonthPeriod(sailedTurn);
+        const arrivalInfo = TimeManager.getMonthPeriod(pos.arrivalTurn);
 
-        if (isInTransit) {
-            const transit = this.getTransitInfo(pos);
-            statusHtml = `
-                <div class="transit-info">
-                    <div class="transit-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${transit.progressPercent}%"></div>
-                        </div>
-                        <span class="progress-text">${Math.round(transit.progressPercent)}%</span>
+        // QP timing - qpMonthIndex is the month AFTER sailing (M+1)
+        const qpMonthIndex = pos.qpMonthIndex !== undefined ? pos.qpMonthIndex : (TimeManager.MONTHS.indexOf(pos.purchaseMonth) + 1);
+        const revealMonthIndex = qpMonthIndex + 1;
+        const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
+        const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
+
+        // Determine timeline stage - only mark completed when actually completed
+        const hasSailed = currentTurn >= sailedTurn;
+        const hasArrived = isArrived || isSold || currentTurn >= pos.arrivalTurn;
+        const qpSettled = pos.qpRevealed === true;
+
+        // Find linked sale record for sold positions
+        let saleRecord = null;
+        let saleQpSettled = false;
+        let isFullyClosed = false;
+        if (isSold) {
+            // Check salesPendingQP and salesCompleted for this position
+            saleRecord = (GAME_STATE.salesPendingQP || []).find(s => s.positionId === pos.id) ||
+                         (GAME_STATE.salesCompleted || []).find(s => s.positionId === pos.id);
+            if (saleRecord) {
+                saleQpSettled = saleRecord.qpRevealed === true;
+            }
+            // Position is fully closed when both purchase and sale QP have settled
+            isFullyClosed = qpSettled && saleQpSettled;
+        }
+
+        // Timeline dot states - only fill when stage is actually completed
+        // No 'current' state for unfilled dots - they should be empty until completed
+        const purchaseDot = 'completed'; // Purchase is always completed (position exists)
+        const sailedDot = hasSailed ? 'completed' : '';
+        const arrivalDot = hasArrived ? 'completed' : '';
+        const qpDot = qpSettled ? 'completed' : '';
+
+        // Labels
+        const sailedLabel = hasSailed ? 'Sailed' : 'Sails';
+        const arrivalLabel = hasArrived ? 'Arrived' : 'ETA';
+        const qpLabel = qpSettled ? 'QP Settled' : 'QP Settles';
+
+        // Cost info
+        const basePrice = pos.qpRevealed ? (pos.actualBasePrice || pos.provisionalBasePrice) : (pos.provisionalBasePrice || pos.pricePerMT);
+        const premium = pos.premium || 0;
+        const freight = pos.freight || 0;
+        const pricePerMT = pos.qpRevealed ? (pos.actualPricePerMT || pos.pricePerMT) : pos.pricePerMT;
+        const totalCost = pos.qpRevealed ? (pos.actualTotalCost || pos.totalCost) : pos.totalCost;
+        const costLabel = pos.qpRevealed ? 'Locked' : 'Provisional';
+
+        // Determine card class
+        let cardClass = '';
+        if (isSold) {
+            cardClass = isFullyClosed ? 'sold closed' : 'sold';
+        } else if (isInTransit) {
+            cardClass = 'in-transit';
+        } else {
+            cardClass = 'arrived';
+        }
+
+        // Status badge
+        let statusBadgeClass = '';
+        let statusBadgeText = '';
+        if (isSold) {
+            if (isFullyClosed) {
+                statusBadgeClass = 'closed';
+                statusBadgeText = 'CLOSED';
+            } else {
+                statusBadgeClass = 'sold';
+                statusBadgeText = 'SOLD - PENDING';
+            }
+        } else if (isInTransit) {
+            statusBadgeClass = 'transit';
+            statusBadgeText = 'IN TRANSIT';
+        } else {
+            statusBadgeClass = 'arrived';
+            statusBadgeText = 'ARRIVED';
+        }
+
+        // Location badge (only for arrived, not sold)
+        const locationHtml = (isArrived && !isSold) ? `
+            <div class="location-row">
+                <span class="icon">[LOC]</span>
+                <span class="text">At ${pos.currentPortName || pos.destinationPortName || pos.destination}</span>
+            </div>
+        ` : '';
+
+        // QP reveal info
+        let qpRevealHtml = '';
+        if (qpSettled) {
+            const settledPrice = pos.actualBasePrice || basePrice;
+            qpRevealHtml = `<span class="qp-reveal settled">[OK] Settled @ $${settledPrice?.toLocaleString()}/MT</span>`;
+        } else {
+            qpRevealHtml = `<span class="qp-reveal pending">[..] Reveals ${revealMonth} Early</span>`;
+        }
+
+        // Sale section for sold positions
+        let saleSectionHtml = '';
+        if (isSold && saleRecord) {
+            const saleRevenue = saleQpSettled ?
+                (saleRecord.actualRevenue || saleRecord.estimatedRevenue) :
+                saleRecord.estimatedRevenue;
+            const saleProfit = saleQpSettled ?
+                (saleRecord.actualProfit || saleRecord.estimatedProfit) :
+                saleRecord.estimatedProfit;
+            const profitClass = saleProfit >= 0 ? 'profit' : 'loss';
+            const saleLabel = saleQpSettled ? 'Final' : 'Est.';
+
+            saleSectionHtml = `
+                <div class="sale-section ${saleQpSettled ? 'settled' : ''}">
+                    <div class="sale-header">${saleLabel} Sale P&L</div>
+                    <div class="sale-details">
+                        <span class="sale-buyer">Sold to ${saleRecord.buyer}</span>
+                        <span class="sale-revenue">Rev: $${saleRevenue?.toLocaleString() || '0'}</span>
+                        <span class="sale-profit ${profitClass}">P&L: ${saleProfit >= 0 ? '+' : ''}$${saleProfit?.toLocaleString() || '0'}</span>
                     </div>
-                    <div class="transit-eta">
-                        ETA: <strong>${transit.etaMonth} ${transit.etaPeriod}</strong> (Turn ${transit.etaTurn})
-                        <span class="days-remaining">~${Math.round(transit.daysRemaining)} days</span>
-                    </div>
-                </div>
-            `;
-            locationHtml = `
-                <div class="detail-row">
-                    <span class="label">Route:</span>
-                    <span>${pos.originPort} → ${pos.destinationPortName || pos.destination}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Destination Region:</span>
-                    <span>${pos.destinationRegion}</span>
-                </div>
-            `;
-        } else if (isArrived) {
-            statusHtml = `
-                <div class="arrived-info">
-                    <span class="location-icon">📍</span>
-                    <span class="current-location">At ${pos.currentPort || pos.destinationPort}</span>
-                </div>
-            `;
-            locationHtml = `
-                <div class="detail-row">
-                    <span class="label">Current Location:</span>
-                    <span class="highlight">${pos.currentPortName || pos.destinationPortName || pos.destination}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Region:</span>
-                    <span>${pos.currentRegion || pos.destinationRegion}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Arrived:</span>
-                    <span>Turn ${pos.arrivedTurn || pos.arrivalTurn}</span>
-                </div>
-            `;
-            actionHtml = `
-                <div class="position-actions">
-                    <button class="trade-btn sell" onclick="TradePanel.openSellFromPosition('${pos.id}')">SELL</button>
+                    ${!saleQpSettled ? `<div class="sale-qp-pending">[..] Sale QP pending</div>` : ''}
                 </div>
             `;
         }
 
         return `
-            <div class="position-card ${isInTransit ? 'in-transit' : 'arrived'}">
-                <div class="position-header">
+            <div class="position-card ${cardClass}">
+                <div class="card-header">
+                    <div class="route">
+                        ${pos.originPort}<span class="arrow">-></span><span class="dest">${pos.destinationPortName || pos.destination}</span>
+                    </div>
+                    <div class="header-right">
+                        <span class="tonnage">${pos.tonnage} MT</span>
+                        <span class="status-badge ${statusBadgeClass}">${statusBadgeText}</span>
+                    </div>
+                </div>
+
+                <div class="card-subheader">
                     <span class="position-id">${pos.id}</span>
-                    <span class="status-badge ${isInTransit ? 'transit' : 'arrived'}">${pos.status.replace('_', ' ')}</span>
+                    <span class="region">${pos.destinationRegion || ''}</span>
                 </div>
-                ${statusHtml}
-                <div class="position-details">
-                    <div class="detail-row">
-                        <span class="label">Quantity:</span>
-                        <span><strong>${pos.tonnage} MT</strong></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Supplier:</span>
-                        <span>${pos.supplier} (${pos.originPort})</span>
-                    </div>
-                    ${locationHtml}
-                    ${this.renderCostBasis(pos)}
-                    <div class="detail-row">
-                        <span class="label">Terms:</span>
-                        <span>${pos.shippingTerms} | ${pos.exchange}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Purchased:</span>
-                        <span>${pos.purchaseMonth} ${pos.purchasePeriod} (Turn ${pos.purchaseTurn})</span>
+
+                ${locationHtml}
+
+                <div class="timeline-section">
+                    <div class="timeline">
+                        <div class="timeline-point">
+                            <span class="point-label">Purchased</span>
+                            <div class="point-dot ${purchaseDot}"></div>
+                            <span class="point-date">${purchaseInfo.monthName.substring(0,3)} ${purchaseInfo.periodName}</span>
+                        </div>
+                        <div class="timeline-point">
+                            <span class="point-label ${!hasSailed ? 'active' : ''}">${sailedLabel}</span>
+                            <div class="point-dot ${sailedDot}"></div>
+                            <span class="point-date">${sailedInfo.monthName.substring(0,3)} ${sailedInfo.periodName}</span>
+                        </div>
+                        <div class="timeline-point">
+                            <span class="point-label ${hasSailed && !hasArrived ? 'active' : ''}">${arrivalLabel}</span>
+                            <div class="point-dot ${arrivalDot}"></div>
+                            <span class="point-date">${arrivalInfo.monthName.substring(0,3)} ${arrivalInfo.periodName}</span>
+                        </div>
+                        <div class="timeline-point">
+                            <span class="point-label qp">${qpLabel}</span>
+                            <div class="point-dot qp ${qpDot}"></div>
+                            <span class="point-date">${revealMonth.substring(0,3)} Early</span>
+                        </div>
                     </div>
                 </div>
-                ${actionHtml}
+
+                <div class="details-section">
+                    <div class="details-grid">
+                        <div class="detail-cell">
+                            <div class="detail-label">SUPPLIER</div>
+                            <div class="detail-value">${pos.supplier}</div>
+                            <div class="detail-value small">${pos.originPort}</div>
+                        </div>
+                        <div class="detail-cell">
+                            <div class="detail-label">TERMS</div>
+                            <div class="detail-value">${pos.shippingTerms || 'CIF'} | ${pos.exchange || 'LME'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cost-section">
+                    <div class="cost-header ${pos.qpRevealed ? 'locked' : 'provisional'}">${costLabel} Cost</div>
+                    <div class="cost-breakdown">
+                        <span class="val">$${basePrice?.toLocaleString() || '0'}</span> base
+                        <span class="op">+</span>
+                        <span class="val">$${premium?.toLocaleString() || '0'}</span> prem
+                        <span class="op">+</span>
+                        <span class="val">$${freight?.toLocaleString() || '0'}</span> frt
+                    </div>
+                    <div class="cost-total">
+                        <span class="permt">$${pricePerMT?.toLocaleString() || '0'}/MT</span>
+                        <span class="total">$${totalCost?.toLocaleString() || '0'} total</span>
+                    </div>
+                </div>
+
+                <div class="qp-section ${qpSettled ? 'settled' : ''}">
+                    <span class="qp-info">QP: <span class="month">${qpMonth}</span> avg</span>
+                    ${qpRevealHtml}
+                </div>
+
+                ${saleSectionHtml}
             </div>
         `;
-    },
-
-    /**
-     * Render cost basis with provisional/final M+1 pricing info
-     */
-    renderCostBasis(pos) {
-        // Check if this position has M+1 pricing info
-        const hasM1Pricing = pos.provisionalBasePrice !== undefined;
-
-        if (!hasM1Pricing) {
-            // Legacy position without M+1 tracking
-            return `
-                <div class="detail-row">
-                    <span class="label">Cost Basis:</span>
-                    <span>$${pos.pricePerMT?.toLocaleString()}/MT ($${pos.totalCost?.toLocaleString()} total)</span>
-                </div>
-            `;
-        }
-
-        // Position has M+1 pricing - check if QP revealed
-        if (pos.qpRevealed) {
-            // QP has been revealed - show final pricing
-            const adjustment = pos.costAdjustment || 0;
-            const adjClass = adjustment <= 0 ? 'positive' : 'negative';
-            const adjSign = adjustment > 0 ? '+' : '';
-            return `
-                <div class="detail-row">
-                    <span class="label">Final Cost:</span>
-                    <span>$${pos.actualPricePerMT?.toLocaleString()}/MT ($${pos.actualTotalCost?.toLocaleString()} total)</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">M+1 Adjustment:</span>
-                    <span class="${adjClass}">${adjSign}$${adjustment.toLocaleString()} ${adjustment > 0 ? '(cost up)' : adjustment < 0 ? '(cost down)' : ''}</span>
-                </div>
-            `;
-        } else {
-            // QP not yet revealed - show provisional with pending notice
-            // qpMonthIndex = M+1 (the month whose average we need, e.g., February for January trade)
-            // revealMonthIndex = M+2 (when the reveal happens, e.g., March for January trade)
-            const qpMonthIndex = pos.qpMonthIndex || (TimeManager.MONTHS.indexOf(pos.purchaseMonth) + 1);
-            const revealMonthIndex = qpMonthIndex + 1;
-            const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
-            const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
-            return `
-                <div class="detail-row">
-                    <span class="label">Provisional Cost:</span>
-                    <span>$${pos.pricePerMT?.toLocaleString()}/MT ($${pos.totalCost?.toLocaleString()} total)</span>
-                </div>
-                <div class="detail-row qp-pending-row">
-                    <span class="label">Final Price:</span>
-                    <span class="qp-pending-badge">⏳ PENDING - ${qpMonth} avg reveals ${revealMonth} Early</span>
-                </div>
-            `;
-        }
     }
 };
 
@@ -2104,17 +1993,14 @@ const FuturesWidget = {
     },
 
     /**
-     * Update calculation
+     * Update calculation (flat $25 fee per contract, no margin)
      */
     updateCalc() {
         const contracts = parseInt(document.getElementById('futuresContracts').value) || 1;
-        const margin = contracts * 9000;
         const fees = contracts * 25;
-        const total = margin + fees;
 
-        document.getElementById('futuresMargin').textContent = '$' + margin.toLocaleString();
         document.getElementById('futuresFees').textContent = '$' + fees.toLocaleString();
-        document.getElementById('futuresTotal').textContent = '$' + total.toLocaleString();
+        document.getElementById('futuresTotal').textContent = '$' + fees.toLocaleString();
     },
 
     /**
@@ -2331,7 +2217,7 @@ const AnalyticsWidget = {
      * Render the analytics widget - 4-card live trading dashboard
      */
     render() {
-        const container = document.getElementById('content4');
+        const container = document.getElementById('analyticsContainer');
         if (!container) return;
 
         // Render the 4-card layout - Bloomberg minimal style
@@ -2469,17 +2355,15 @@ const AnalyticsWidget = {
                 ? (monthData.PRICING.COMEX?.SPOT_AVG || 0)
                 : (monthData.PRICING.LME?.SPOT_AVG || 0);
 
-            const regionalPremium = sale.regionalPremium || 0;
-            const estimatedPrice = currentSpot + regionalPremium;
+            // Use correct field names from sale record: 'premium' not 'regionalPremium'
+            const salePremium = sale.premium || 0;
+            const estimatedPrice = currentSpot + salePremium;
             const estimatedRevenue = (sale.tonnage || 0) * estimatedPrice;
-            const cost = sale.originalCost || (sale.tonnage * (sale.costPerMT || 0));
+            // Use correct field names: 'costBasis' and 'pricePerMT' not 'originalCost' and 'costPerMT'
+            const cost = sale.costBasis || (sale.tonnage * (sale.pricePerMT || 0));
 
             unrealizedPnL += (estimatedRevenue - cost);
         });
-
-        // Subtract interest paid
-        const interestPaid = GAME_STATE.totalInterestPaid || 0;
-        realizedPnL -= interestPaid;
 
         return {
             realized: Math.round(realizedPnL),
@@ -3073,7 +2957,7 @@ const TabManager = {
             case 'Futures':
                 FuturesWidget.render();
                 break;
-            case 'Analytics':
+            case 'Analytics': {
                 // Show analytics, hide hedge status
                 const analyticsEl = document.getElementById('analyticsContainer');
                 const hedgeStatusEl = document.getElementById('hedgeStatusContainer');
@@ -3081,14 +2965,16 @@ const TabManager = {
                 if (hedgeStatusEl) hedgeStatusEl.style.display = 'none';
                 AnalyticsWidget.render();
                 break;
-            case 'HedgeStatus':
+            }
+            case 'HedgeStatus': {
                 // Show hedge status, hide analytics
-                const analyticsEl2 = document.getElementById('analyticsContainer');
-                const hedgeStatusEl2 = document.getElementById('hedgeStatusContainer');
-                if (analyticsEl2) analyticsEl2.style.display = 'none';
-                if (hedgeStatusEl2) hedgeStatusEl2.style.display = 'block';
+                const analyticsEl = document.getElementById('analyticsContainer');
+                const hedgeStatusEl = document.getElementById('hedgeStatusContainer');
+                if (analyticsEl) analyticsEl.style.display = 'none';
+                if (hedgeStatusEl) hedgeStatusEl.style.display = 'block';
                 HedgeStatusWidget.render();
                 break;
+            }
             case 'Map':
                 // Map is always visible
                 break;
@@ -3124,221 +3010,7 @@ const SidebarManager = {
 
 
 // ============================================================
-// SECTION 10: BANK WIDGET (LOC Management)
-// ============================================================
-
-const BankWidget = {
-    /**
-     * Render the bank widget in sidebar or dedicated panel
-     */
-    render() {
-        const container = document.getElementById('bankContent');
-        if (!container) return;
-
-        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
-        const utilizationPercent = ((GAME_STATE.locUsed / GAME_STATE.lineOfCredit) * 100).toFixed(1);
-
-        let html = `
-            <div class="bank-section">
-                <h4>LINE OF CREDIT</h4>
-                <div class="bank-stats">
-                    <div class="stat-row">
-                        <span class="label">Credit Limit:</span>
-                        <span class="value">$${GAME_STATE.lineOfCredit.toLocaleString()}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Used:</span>
-                        <span class="value ${GAME_STATE.locUsed > 0 ? 'negative' : ''}">$${GAME_STATE.locUsed.toLocaleString()}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Available:</span>
-                        <span class="value positive">$${locAvailable.toLocaleString()}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Utilization:</span>
-                        <span class="value">${utilizationPercent}%</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Interest Rate:</span>
-                        <span class="value">${(GAME_STATE.locInterestRate * 100).toFixed(2)}% / month</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Total Interest Paid:</span>
-                        <span class="value negative">$${GAME_STATE.totalInterestPaid.toLocaleString()}</span>
-                    </div>
-                </div>
-
-                <div class="bank-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(utilizationPercent, 100)}%"></div>
-                    </div>
-                </div>
-
-                <div class="bank-actions">
-                    <button class="bank-btn draw" onclick="BankWidget.openDrawPanel()" ${locAvailable <= 0 ? 'disabled' : ''}>
-                        DRAW FUNDS
-                    </button>
-                    <button class="bank-btn repay" onclick="BankWidget.openRepayPanel()" ${GAME_STATE.locUsed <= 0 ? 'disabled' : ''}>
-                        REPAY LOAN
-                    </button>
-                </div>
-
-                <div class="bank-note">
-                    <small>Interest charged at end of each month on outstanding balance.</small>
-                </div>
-            </div>
-        `;
-
-        container.innerHTML = html;
-    },
-
-    /**
-     * Open draw funds panel
-     */
-    openDrawPanel() {
-        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
-        if (locAvailable <= 0) {
-            alert('No credit available to draw!');
-            return;
-        }
-
-        document.getElementById('bankDrawMax').textContent = '$' + locAvailable.toLocaleString();
-        document.getElementById('bankDrawAmount').max = locAvailable;
-        document.getElementById('bankDrawAmount').value = Math.min(50000, locAvailable);
-        this.updateDrawCalc();
-
-        document.getElementById('bankDrawPanel').style.display = 'block';
-    },
-
-    /**
-     * Update draw calculation
-     */
-    updateDrawCalc() {
-        const amount = parseInt(document.getElementById('bankDrawAmount').value) || 0;
-        const newFunds = GAME_STATE.practiceFunds + amount;
-        const newLocUsed = GAME_STATE.locUsed + amount;
-        const monthlyInterest = Math.round(newLocUsed * GAME_STATE.locInterestRate);
-
-        document.getElementById('bankDrawNewFunds').textContent = '$' + newFunds.toLocaleString();
-        document.getElementById('bankDrawNewLoc').textContent = '$' + newLocUsed.toLocaleString();
-        document.getElementById('bankDrawInterest').textContent = '$' + monthlyInterest.toLocaleString() + '/month';
-    },
-
-    /**
-     * Execute draw
-     */
-    executeDraw() {
-        const amount = parseInt(document.getElementById('bankDrawAmount').value) || 0;
-        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
-
-        if (amount <= 0) {
-            alert('Please enter a valid amount!');
-            return;
-        }
-
-        if (amount > locAvailable) {
-            alert('Amount exceeds available credit!');
-            return;
-        }
-
-        // Transfer from LOC to practice funds
-        GAME_STATE.locUsed += amount;
-        GAME_STATE.practiceFunds += amount;
-
-        console.log(`[BANK] Drew $${amount.toLocaleString()} from LOC`);
-
-        // Close panel and update displays
-        this.closePanel();
-        GAME_STATE.updateHeader();
-        this.render();
-        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
-        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-
-        alert(`Successfully drew $${amount.toLocaleString()} from Line of Credit!`);
-    },
-
-    /**
-     * Open repay panel
-     */
-    openRepayPanel() {
-        if (GAME_STATE.locUsed <= 0) {
-            alert('No outstanding balance to repay!');
-            return;
-        }
-
-        const maxRepay = Math.min(GAME_STATE.practiceFunds, GAME_STATE.locUsed);
-        document.getElementById('bankRepayOutstanding').textContent = '$' + GAME_STATE.locUsed.toLocaleString();
-        document.getElementById('bankRepayMax').textContent = '$' + maxRepay.toLocaleString();
-        document.getElementById('bankRepayAmount').max = maxRepay;
-        document.getElementById('bankRepayAmount').value = Math.min(maxRepay, GAME_STATE.locUsed);
-        this.updateRepayCalc();
-
-        document.getElementById('bankRepayPanel').style.display = 'block';
-    },
-
-    /**
-     * Update repay calculation
-     */
-    updateRepayCalc() {
-        const amount = parseInt(document.getElementById('bankRepayAmount').value) || 0;
-        const newFunds = GAME_STATE.practiceFunds - amount;
-        const newLocUsed = GAME_STATE.locUsed - amount;
-        const monthlyInterest = Math.round(newLocUsed * GAME_STATE.locInterestRate);
-
-        document.getElementById('bankRepayNewFunds').textContent = '$' + newFunds.toLocaleString();
-        document.getElementById('bankRepayNewLoc').textContent = '$' + newLocUsed.toLocaleString();
-        document.getElementById('bankRepaySavings').textContent = '$' + Math.round(amount * GAME_STATE.locInterestRate).toLocaleString() + '/month';
-    },
-
-    /**
-     * Execute repay
-     */
-    executeRepay() {
-        const amount = parseInt(document.getElementById('bankRepayAmount').value) || 0;
-
-        if (amount <= 0) {
-            alert('Please enter a valid amount!');
-            return;
-        }
-
-        if (amount > GAME_STATE.practiceFunds) {
-            alert('Insufficient funds to repay!');
-            return;
-        }
-
-        if (amount > GAME_STATE.locUsed) {
-            alert('Amount exceeds outstanding balance!');
-            return;
-        }
-
-        // Transfer from practice funds to LOC
-        GAME_STATE.practiceFunds -= amount;
-        GAME_STATE.locUsed -= amount;
-
-        console.log(`[BANK] Repaid $${amount.toLocaleString()} to LOC`);
-
-        // Close panel and update displays
-        this.closePanel();
-        GAME_STATE.updateHeader();
-        this.render();
-        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
-        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-
-        alert(`Successfully repaid $${amount.toLocaleString()} to Line of Credit!`);
-    },
-
-    /**
-     * Close panels
-     */
-    closePanel() {
-        document.getElementById('bankDrawPanel').style.display = 'none';
-        document.getElementById('bankRepayPanel').style.display = 'none';
-    }
-};
-
-
-// ============================================================
-// SECTION 11: DEBUG PANEL
+// SECTION 10: DEBUG PANEL
 // ============================================================
 
 const DebugPanel = {
@@ -3406,22 +3078,16 @@ Month:          ${timeInfo.monthName} (index: ${timeInfo.monthIndex})
 Period:         ${timeInfo.periodName} (${timeInfo.period}/2)
 Display:        ${TimeManager.getDisplayString()}
 Remaining:      ${TimeManager.getRemainingTurns()} turns
-Month Boundary: ${TimeManager.isMonthBoundary() ? 'YES (interest will charge on next turn)' : 'No'}
+Month Boundary: ${TimeManager.isMonthBoundary() ? 'YES' : 'No'}
 </pre>
 </div>
 
 <div class="debug-section">
 <h4>💰 FINANCIAL</h4>
 <pre>
-Practice Funds: $${GAME_STATE.practiceFunds.toLocaleString()}
-LOC Limit:      $${GAME_STATE.lineOfCredit.toLocaleString()}
-LOC Used:       $${GAME_STATE.locUsed.toLocaleString()}
-LOC Available:  $${(GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
-Buying Power:   $${(GAME_STATE.practiceFunds + GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
-Total P&L:      $${GAME_STATE.totalPL.toLocaleString()}
-Interest Paid:  $${GAME_STATE.totalInterestPaid.toLocaleString()}
-Interest Rate:  ${(GAME_STATE.locInterestRate * 100).toFixed(2)}% monthly
-Inventory:      ${GAME_STATE.inventory} MT
+Funds:     $${GAME_STATE.practiceFunds.toLocaleString()}
+Total P&L: $${GAME_STATE.totalPL.toLocaleString()}
+Inventory: ${GAME_STATE.inventory} MT
 </pre>
 </div>
 
@@ -3639,18 +3305,16 @@ const HedgeStatusWidget = {
         const coverage = this.calculateCoverage(position, linkedFutures);
 
         const statusClass = hedgeStatus.status;
-        const statusIcon = hedgeStatus.status === 'hedged' ? '🛡️' :
-                          hedgeStatus.status === 'partial' ? '⚠️' : '🔓';
 
         return `
             <div class="hedge-card ${statusClass}">
                 <div class="hedge-card-header">
                     <div class="hedge-position-info">
                         <span class="hedge-id">${position.id}</span>
-                        <span class="hedge-route">${position.supplier} → ${position.destination}</span>
+                        <span class="hedge-route">${position.supplier} > ${position.destination}</span>
                     </div>
                     <div class="hedge-status-badge ${statusClass}">
-                        ${statusIcon} ${hedgeStatus.label}
+                        ${hedgeStatus.label.toUpperCase()}
                     </div>
                 </div>
 
@@ -3745,7 +3409,7 @@ const HedgeStatusWidget = {
     renderEmptyState() {
         return `
             <div class="hedge-empty-state">
-                <div class="empty-icon">📊</div>
+                <div class="empty-icon">--</div>
                 <div class="empty-title">No Physical Positions</div>
                 <div class="empty-message">
                     Buy copper to start tracking hedge coverage
@@ -3801,15 +3465,15 @@ const HedgeStatusWidget = {
                     <h4>Trading Signals</h4>
                     ${spotSpread > 200 ? `
                         <div class="arb-signal positive">
-                            📈 COMEX premium elevated - consider LME sourcing for COMEX delivery
+                            [+] COMEX premium elevated - consider LME sourcing for COMEX delivery
                         </div>
                     ` : spotSpread < -100 ? `
                         <div class="arb-signal negative">
-                            📉 COMEX discount - unusual, check market conditions
+                            [-] COMEX discount - unusual, check market conditions
                         </div>
                     ` : `
                         <div class="arb-signal neutral">
-                            ➖ Exchange spreads within normal range
+                            [=] Exchange spreads within normal range
                         </div>
                     `}
                 </div>
@@ -3946,7 +3610,6 @@ document.addEventListener('DOMContentLoaded', () => {
     MarketsWidget.render();
     PositionsWidget.render();
     AnalyticsWidget.render();
-    BankWidget.render();
     HedgeStatusWidget.render();
 
     // Initialize map
