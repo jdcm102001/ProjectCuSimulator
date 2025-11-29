@@ -108,6 +108,10 @@ body {
     color: #f44336;
 }
 
+.metric-value.pending {
+    color: #ff9800;  /* Orange for pending receivables */
+}
+
 /* ============ WORKSPACE ============ */
 #workspace {
     flex: 1;

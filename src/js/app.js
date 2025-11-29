@@ -411,6 +411,7 @@ const TimeManager = {
 const GAME_STATE = {
     // Finances (cash-only, no LOC)
     practiceFunds: 200000,
+    accountsReceivable: 0,  // Pending cash from sales (released at QP settlement)
 
     // Positions
     physicalPositions: [],
@@ -581,11 +582,16 @@ const GAME_STATE = {
         // Update sidebar metrics
         const periodEl = document.getElementById('sidebarPeriod');
         const fundsEl = document.getElementById('sidebarFunds');
+        const receivableEl = document.getElementById('sidebarReceivable');
         const plEl = document.getElementById('sidebarPL');
         const inventoryEl = document.getElementById('sidebarInventory');
 
         if (periodEl) periodEl.textContent = TimeManager.getDisplayString();
         if (fundsEl) fundsEl.textContent = this.formatCurrency(this.practiceFunds);
+        if (receivableEl) {
+            receivableEl.textContent = this.formatCurrency(this.accountsReceivable);
+            receivableEl.className = 'metric-value ' + (this.accountsReceivable > 0 ? 'pending' : '');
+        }
         if (plEl) {
             plEl.textContent = this.formatCurrency(this.totalPL);
             plEl.className = 'metric-value ' + (this.totalPL >= 0 ? 'positive' : 'negative');
@@ -806,7 +812,7 @@ const GAME_STATE = {
         );
 
         if (salesToProcess.length > 0) {
-            console.log(`[QP] Processing ${salesToProcess.length} sales for M+1 repricing...`);
+            console.log(`[QP] Processing ${salesToProcess.length} sales for QP settlement...`);
 
             salesToProcess.forEach(sale => {
                 // Get actual M+1 price (the QP month's average)
@@ -817,9 +823,8 @@ const GAME_STATE = {
                 const actualRevenue = actualSalePrice * sale.tonnage;
                 const actualProfit = actualRevenue - sale.costBasis;
 
-                // Calculate adjustment (difference from estimate)
+                // Calculate adjustment for display purposes
                 const adjustment = actualRevenue - sale.estimatedRevenue;
-                const profitAdjustment = actualProfit - sale.estimatedProfit;
 
                 // Update sale record
                 sale.actualBasePrice = actualBasePrice;
@@ -830,32 +835,29 @@ const GAME_STATE = {
                 sale.qpRevealed = true;
                 sale.status = 'SETTLED';
 
-                // Apply adjustment to funds and P&L
-                this.practiceFunds += adjustment;
-                this.totalPL += profitAdjustment;
-                totalSaleAdjustment += adjustment;
+                // Release receivables and receive actual cash
+                // 1. Remove estimated amount from accounts receivable
+                this.accountsReceivable -= sale.estimatedRevenue;
+                // 2. Add actual revenue to funds (this is when cash is received)
+                this.practiceFunds += actualRevenue;
+                // 3. Update P&L with actual profit
+                this.totalPL += actualProfit;
+
+                totalSaleAdjustment += actualRevenue;  // Track total cash received
                 salesProcessed++;
 
-                console.log(`[QP] Sale ${sale.id} repriced:`);
+                console.log(`[QP] Sale ${sale.id} settled:`);
                 console.log(`     Est: $${sale.estimatedBasePrice}/MT → Act: $${actualBasePrice}/MT`);
-                console.log(`     Adjustment: $${adjustment.toLocaleString()}`);
+                console.log(`     Cash received: $${actualRevenue.toLocaleString()}`);
+                console.log(`     Profit realized: $${actualProfit.toLocaleString()}`);
 
-                // Send notification for this sale
-                if (adjustment > 0) {
-                    NotificationManager.add(
-                        'qp-credit',
-                        'QP Settlement: Letter of Credit',
-                        `${qpMonthName} avg revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale received +$${adjustment.toLocaleString()} credit.`,
-                        '💰'
-                    );
-                } else if (adjustment < 0) {
-                    NotificationManager.add(
-                        'qp-debit',
-                        'QP Settlement: Letter of Debit',
-                        `${qpMonthName} avg revealed at $${actualBasePrice.toLocaleString()}/MT. Your ${sale.saleMonth} sale revenue decreased by $${Math.abs(adjustment).toLocaleString()}.`,
-                        '📉'
-                    );
-                }
+                // Send notification for sale settlement
+                NotificationManager.add(
+                    'qp-settlement',
+                    'QP Settlement: Payment Received',
+                    `${qpMonthName} avg settled at $${actualBasePrice.toLocaleString()}/MT. Received $${actualRevenue.toLocaleString()} for your ${sale.saleMonth} sale (Profit: $${actualProfit.toLocaleString()}).`,
+                    '💰'
+                );
 
                 // Move to completed sales
                 this.salesCompleted.push(sale);
@@ -1231,21 +1233,20 @@ const GAME_STATE = {
             saleRecord.qpRevealed = true;
             saleRecord.status = 'SETTLED';
 
-            // Immediate settlement for June
+            // June: immediate cash settlement (no QP delay)
             this.practiceFunds += estimatedRevenue;
             this.totalPL += estimatedProfit;
             this.salesCompleted.push(saleRecord);
 
             console.log('[TRADE] June sale settled immediately:', saleRecord.id);
         } else {
-            // M+1 repricing: Add to pending QP
-            // Credit estimated revenue now (will be adjusted at QP reveal)
-            this.practiceFunds += estimatedRevenue;
-            this.totalPL += estimatedProfit;
+            // M+1 repricing: NO immediate cash - add to accounts receivable
+            // Cash will be received when QP settles at M+1
+            this.accountsReceivable += estimatedRevenue;
             this.salesPendingQP.push(saleRecord);
 
-            console.log('[TRADE] Sale pending QP reveal at M+1:', saleRecord.id);
-            console.log('[TRADE] Estimated profit:', estimatedProfit, '(subject to QP adjustment)');
+            console.log('[TRADE] Sale pending QP - added to receivables:', saleRecord.id);
+            console.log('[TRADE] Estimated revenue:', estimatedRevenue, '(cash at QP settlement)');
         }
 
         // Update display
