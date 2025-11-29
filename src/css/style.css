@@ -281,12 +281,19 @@ body {
     color: #666;
 }
 
-/* ============ POSITION CARDS ============ */
+/* ============ POSITIONS CONTAINER ============ */
+.positions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ============ POSITION CARDS - New Timeline Layout ============ */
 .position-card {
     background: #2a2a2a;
     border: 1px solid #444;
-    margin-bottom: 12px;
-    padding: 12px;
+    padding: 0;
+    font-family: 'Courier New', monospace;
 }
 
 .position-card.in-transit {
@@ -297,133 +304,299 @@ body {
     border-left: 3px solid #4CAF50;
 }
 
-.position-card.pending-qp {
-    border-left: 3px solid #ff9800;
-}
-
-.position-header {
+/* Card Header */
+.position-card .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
+    padding: 10px 12px;
+    background: #333;
+    border-bottom: 1px solid #444;
+}
+
+.position-card .route {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.position-card .route .arrow {
+    color: #666;
+    margin: 0 4px;
+}
+
+.position-card .route .dest {
+    color: #fff;
+}
+
+.position-card .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.position-card .tonnage {
+    font-size: 11px;
+    color: #aaa;
+    font-weight: 600;
+}
+
+/* Card Subheader */
+.position-card .card-subheader {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: #2a2a2a;
     border-bottom: 1px solid #333;
 }
 
-.position-id {
-    font-size: 11px;
-    color: #888;
-    font-family: monospace;
+.position-card .position-id {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-.status-badge.pending {
+.position-card .region {
+    font-size: 10px;
+    color: #888;
+}
+
+/* Location Row (arrived only) */
+.position-card .location-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+}
+
+.position-card .location-row .icon {
+    font-size: 10px;
+    color: #4CAF50;
+}
+
+.position-card .location-row .text {
+    font-size: 11px;
+    color: #4CAF50;
+    font-weight: 600;
+}
+
+/* Timeline Section */
+.position-card .timeline-section {
+    padding: 12px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+}
+
+.position-card .timeline {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+}
+
+.position-card .timeline::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: #444;
+    transform: translateY(-50%);
+    z-index: 0;
+}
+
+.position-card .timeline-point {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    z-index: 1;
+    flex: 1;
+}
+
+.position-card .point-label {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.position-card .point-label.active {
+    color: #2196F3;
+    font-weight: 600;
+}
+
+.position-card .point-label.qp {
     color: #ff9800;
+}
+
+.position-card .point-dot {
+    width: 10px;
+    height: 10px;
+    background: #333;
+    border: 2px solid #555;
+}
+
+.position-card .point-dot.completed {
+    background: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.position-card .point-dot.current {
+    background: #2196F3;
+    border-color: #2196F3;
+    box-shadow: 0 0 6px rgba(33, 150, 243, 0.5);
+}
+
+.position-card .point-dot.qp {
     border-color: #ff9800;
 }
 
-/* Transit Progress */
-.transit-info {
-    margin-bottom: 12px;
-    padding: 8px;
-    background: #252525;
-    border: 1px solid #333;
+.position-card .point-dot.qp.completed {
+    background: #4CAF50;
+    border-color: #4CAF50;
 }
 
-.transit-progress {
+.position-card .point-date {
+    font-size: 9px;
+    color: #888;
+}
+
+/* Details Section */
+.position-card .details-section {
+    padding: 10px 12px;
+    border-bottom: 1px solid #333;
+}
+
+.position-card .details-grid {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    gap: 20px;
+}
+
+.position-card .detail-cell {
+    flex: 1;
+}
+
+.position-card .detail-label {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.position-card .detail-value {
+    font-size: 11px;
+    color: #e0e0e0;
+}
+
+.position-card .detail-value.small {
+    font-size: 10px;
+    color: #888;
+    margin-top: 2px;
+}
+
+/* Cost Section */
+.position-card .cost-section {
+    padding: 10px 12px;
+    background: #252525;
+    border-bottom: 1px solid #333;
+}
+
+.position-card .cost-header {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
     margin-bottom: 6px;
 }
 
-.transit-progress .progress-bar {
-    flex: 1;
-    height: 8px;
-    background: #333;
-    border: 1px solid #444;
+.position-card .cost-header.provisional {
+    color: #ff9800;
 }
 
-.transit-progress .progress-fill {
-    height: 100%;
-    background: #2196F3;
-}
-
-.transit-progress .progress-text {
-    font-size: 11px;
-    color: #2196F3;
-    min-width: 35px;
-}
-
-.transit-eta {
-    font-size: 11px;
-    color: #ccc;
-}
-
-.transit-eta strong {
-    color: #2196F3;
-}
-
-.days-remaining {
-    color: #888;
-    margin-left: 10px;
-}
-
-/* Arrived Info */
-.arrived-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    padding: 8px;
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid #4CAF50;
-}
-
-.location-icon {
-    font-size: 16px;
-}
-
-.current-location {
+.position-card .cost-header.locked {
     color: #4CAF50;
-    font-weight: bold;
 }
 
-/* Position Details */
-.position-details {
-    font-size: 12px;
+.position-card .cost-breakdown {
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 6px;
 }
 
-.detail-row {
+.position-card .cost-breakdown .val {
+    color: #e0e0e0;
+    font-weight: 600;
+}
+
+.position-card .cost-breakdown .op {
+    color: #555;
+    margin: 0 2px;
+}
+
+.position-card .cost-total {
     display: flex;
     justify-content: space-between;
-    padding: 4px 0;
-    border-bottom: 1px dotted #333;
+    font-size: 11px;
 }
 
-.detail-row:last-child {
-    border-bottom: none;
+.position-card .cost-total .permt {
+    color: #fff;
+    font-weight: 600;
 }
 
-.detail-row .label {
+.position-card .cost-total .total {
+    color: #aaa;
+}
+
+/* QP Section */
+.position-card .qp-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border-top: 1px solid #333;
+}
+
+.position-card .qp-info {
+    font-size: 10px;
     color: #888;
 }
 
-.detail-row .highlight {
+.position-card .qp-info .month {
+    color: #ff9800;
+    font-weight: 600;
+}
+
+.position-card .qp-reveal {
+    font-size: 10px;
+}
+
+.position-card .qp-reveal.pending {
+    color: #ff9800;
+}
+
+.position-card .qp-reveal.settled {
     color: #4CAF50;
-    font-weight: bold;
 }
 
-/* Position Actions */
-.position-actions {
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid #333;
-    display: flex;
-    gap: 8px;
+.position-card .qp-section.settled {
+    background: rgba(76, 175, 80, 0.05);
 }
 
-.position-actions .trade-btn {
-    flex: 1;
+.position-card .qp-section.settled .qp-info .month {
+    color: #4CAF50;
+}
+
+/* Legacy status badge support */
+.status-badge.pending {
+    color: #ff9800;
+    border-color: #ff9800;
 }
 
 /* Futures Widget */

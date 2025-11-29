@@ -1698,7 +1698,7 @@ const PositionsWidget = {
     },
 
     /**
-     * Render the positions widget
+     * Render the positions widget - Physical positions only
      */
     render() {
         const container = document.getElementById('content2');
@@ -1710,9 +1710,8 @@ const PositionsWidget = {
 
         let html = '';
 
-        // Physical positions
-        html += '<div class="markets-section">';
-        html += '<h4>PHYSICAL POSITIONS</h4>';
+        // Physical positions only
+        html += '<div class="positions-container">';
 
         const physPositions = GAME_STATE.physicalPositions.filter(p => p.status !== 'SOLD');
 
@@ -1725,267 +1724,153 @@ const PositionsWidget = {
         }
         html += '</div>';
 
-        // Purchases Pending QP
-        const pendingPurchases = GAME_STATE.purchasesPendingQP || [];
-        if (pendingPurchases.length > 0) {
-            html += '<div class="markets-section">';
-            html += '<h4>PURCHASES PENDING QP REVEAL</h4>';
-            pendingPurchases.forEach(purchase => {
-                const qpMonth = TimeManager.MONTHS[purchase.qpMonthIndex] || 'N/A';
-                const revealMonth = TimeManager.MONTHS[purchase.qpMonthIndex + 1] || 'N/A';
-                html += `
-                    <div class="position-card pending-qp purchase">
-                        <div class="position-header">
-                            <span class="position-id">${purchase.id || purchase.positionId}</span>
-                            <span class="status-badge pending">PENDING QP</span>
-                        </div>
-                        <div class="position-details">
-                            <div class="detail-row">
-                                <span class="label">Purchased:</span>
-                                <span>${purchase.tonnage} MT from ${purchase.supplier}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">QP Reveals:</span>
-                                <span class="highlight">${revealMonth} Early (${qpMonth} avg)</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Prov. Base:</span>
-                                <span>$${purchase.provisionalBasePrice?.toLocaleString()}/MT</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Premium (Fixed):</span>
-                                <span>$${purchase.premium?.toLocaleString()}/MT</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Prov. Total:</span>
-                                <span>$${purchase.totalCost?.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-        }
-
-        // Sales Pending QP
-        const pendingQP = GAME_STATE.salesPendingQP || [];
-        if (pendingQP.length > 0) {
-            html += '<div class="markets-section">';
-            html += '<h4>SALES PENDING QP REVEAL</h4>';
-            pendingQP.forEach(sale => {
-                const qpMonth = TimeManager.MONTHS[sale.qpMonthIndex] || 'N/A';
-                const revealMonth = TimeManager.MONTHS[sale.qpMonthIndex + 1] || 'N/A';
-                html += `
-                    <div class="position-card pending-qp sale">
-                        <div class="position-header">
-                            <span class="position-id">${sale.id}</span>
-                            <span class="status-badge pending">PENDING QP</span>
-                        </div>
-                        <div class="position-details">
-                            <div class="detail-row">
-                                <span class="label">Sold:</span>
-                                <span>${sale.tonnage} MT to ${sale.buyer}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">QP Reveals:</span>
-                                <span class="highlight">${revealMonth} Early (${qpMonth} avg)</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Est. Revenue:</span>
-                                <span>$${sale.estimatedRevenue?.toLocaleString()}</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="label">Est. Profit:</span>
-                                <span class="${sale.estimatedProfit >= 0 ? 'positive' : 'negative'}">$${sale.estimatedProfit?.toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-        }
-
-        // Futures positions
-        html += '<div class="markets-section">';
-        html += '<h4>FUTURES POSITIONS</h4>';
-
-        const futPositions = GAME_STATE.futuresPositions.filter(p => p.status === 'OPEN');
-
-        if (futPositions.length === 0) {
-            html += '<div class="empty-state">No open futures</div>';
-        } else {
-            html += '<table class="positions-table">';
-            html += '<tr><th>Contract</th><th>Dir</th><th>Qty</th><th>Entry</th><th>P&L</th><th></th></tr>';
-
-            futPositions.forEach(pos => {
-                const plClass = pos.unrealizedPL >= 0 ? 'positive' : 'negative';
-                html += `
-                    <tr>
-                        <td>${pos.exchange} ${pos.contract}</td>
-                        <td>${pos.direction}</td>
-                        <td>${pos.contracts}</td>
-                        <td>$${pos.entryPrice}</td>
-                        <td class="${plClass}">$${pos.unrealizedPL.toLocaleString()}</td>
-                        <td><button class="trade-btn sell" onclick="GAME_STATE.closeFutures('${pos.id}')">CLOSE</button></td>
-                    </tr>
-                `;
-            });
-            html += '</table>';
-        }
-        html += '</div>';
-
         container.innerHTML = html;
     },
 
     /**
-     * Render a single position card with full details
+     * Render a single position card with timeline layout
      */
     renderPositionCard(pos) {
         const isInTransit = pos.status === 'IN_TRANSIT';
         const isArrived = pos.status === 'ARRIVED';
+        const currentTurn = TimeManager.currentTurn;
 
-        let statusHtml = '';
-        let locationHtml = '';
-        let actionHtml = '';
+        // Get timing info
+        const purchaseInfo = TimeManager.getMonthPeriod(pos.purchaseTurn);
+        const sailedTurn = pos.purchaseTurn + 1;
+        const sailedInfo = TimeManager.getMonthPeriod(sailedTurn);
+        const arrivalInfo = TimeManager.getMonthPeriod(pos.arrivalTurn);
 
-        if (isInTransit) {
-            const transit = this.getTransitInfo(pos);
-            statusHtml = `
-                <div class="transit-info">
-                    <div class="transit-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${transit.progressPercent}%"></div>
-                        </div>
-                        <span class="progress-text">${Math.round(transit.progressPercent)}%</span>
-                    </div>
-                    <div class="transit-eta">
-                        ETA: <strong>${transit.etaMonth} ${transit.etaPeriod}</strong> (Turn ${transit.etaTurn})
-                        <span class="days-remaining">~${Math.round(transit.daysRemaining)} days</span>
-                    </div>
-                </div>
-            `;
-            locationHtml = `
-                <div class="detail-row">
-                    <span class="label">Route:</span>
-                    <span>${pos.originPort} → ${pos.destinationPortName || pos.destination}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Destination Region:</span>
-                    <span>${pos.destinationRegion}</span>
-                </div>
-            `;
-        } else if (isArrived) {
-            statusHtml = `
-                <div class="arrived-info">
-                    <span class="location-icon">📍</span>
-                    <span class="current-location">At ${pos.currentPort || pos.destinationPort}</span>
-                </div>
-            `;
-            locationHtml = `
-                <div class="detail-row">
-                    <span class="label">Current Location:</span>
-                    <span class="highlight">${pos.currentPortName || pos.destinationPortName || pos.destination}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Region:</span>
-                    <span>${pos.currentRegion || pos.destinationRegion}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Arrived:</span>
-                    <span>Turn ${pos.arrivedTurn || pos.arrivalTurn}</span>
-                </div>
-            `;
-            actionHtml = `
-                <div class="position-actions">
-                    <button class="trade-btn sell" onclick="TradePanel.openSellFromPosition('${pos.id}')">SELL</button>
-                </div>
-            `;
+        // QP timing - qpMonthIndex is the month AFTER sailing (M+1)
+        const qpMonthIndex = pos.qpMonthIndex !== undefined ? pos.qpMonthIndex : (TimeManager.MONTHS.indexOf(pos.purchaseMonth) + 1);
+        const revealMonthIndex = qpMonthIndex + 1;
+        const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
+        const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
+
+        // Determine timeline stage
+        // Stage 1: Just purchased (before sailed)
+        // Stage 2: In transit (sailed but not arrived)
+        // Stage 3: Arrived
+        // Stage 4: QP Settled
+        const hasSailed = currentTurn >= sailedTurn;
+        const hasArrived = isArrived || currentTurn >= pos.arrivalTurn;
+        const qpSettled = pos.qpRevealed === true;
+
+        // Timeline dot states
+        const purchaseDot = 'completed';
+        const sailedDot = hasSailed ? 'completed' : 'current';
+        const arrivalDot = hasArrived ? 'completed' : (hasSailed ? 'current' : '');
+        const qpDot = qpSettled ? 'completed' : '';
+
+        // Labels
+        const sailedLabel = hasSailed ? 'Sailed' : 'Sails';
+        const arrivalLabel = hasArrived ? 'Arrived' : 'ETA';
+        const qpLabel = qpSettled ? 'QP Settled' : 'QP Settles';
+
+        // Cost info
+        const basePrice = pos.qpRevealed ? (pos.actualBasePrice || pos.provisionalBasePrice) : (pos.provisionalBasePrice || pos.pricePerMT);
+        const premium = pos.premium || 0;
+        const freight = pos.freight || 0;
+        const pricePerMT = pos.qpRevealed ? (pos.actualPricePerMT || pos.pricePerMT) : pos.pricePerMT;
+        const totalCost = pos.qpRevealed ? (pos.actualTotalCost || pos.totalCost) : pos.totalCost;
+        const costLabel = pos.qpRevealed ? 'Locked' : 'Provisional';
+
+        // Location badge (only for arrived)
+        const locationHtml = isArrived ? `
+            <div class="location-row">
+                <span class="icon">[LOC]</span>
+                <span class="text">At ${pos.currentPortName || pos.destinationPortName || pos.destination}</span>
+            </div>
+        ` : '';
+
+        // QP reveal info
+        let qpRevealHtml = '';
+        if (qpSettled) {
+            const settledPrice = pos.actualBasePrice || basePrice;
+            qpRevealHtml = `<span class="qp-reveal settled">[OK] Settled @ $${settledPrice?.toLocaleString()}/MT</span>`;
+        } else {
+            qpRevealHtml = `<span class="qp-reveal pending">[..] Reveals ${revealMonth} Early</span>`;
         }
 
         return `
             <div class="position-card ${isInTransit ? 'in-transit' : 'arrived'}">
-                <div class="position-header">
+                <div class="card-header">
+                    <div class="route">
+                        ${pos.originPort}<span class="arrow">-></span><span class="dest">${pos.destinationPortName || pos.destination}</span>
+                    </div>
+                    <div class="header-right">
+                        <span class="tonnage">${pos.tonnage} MT</span>
+                        <span class="status-badge ${isInTransit ? 'transit' : 'arrived'}">${isInTransit ? 'IN TRANSIT' : 'ARRIVED'}</span>
+                    </div>
+                </div>
+
+                <div class="card-subheader">
                     <span class="position-id">${pos.id}</span>
-                    <span class="status-badge ${isInTransit ? 'transit' : 'arrived'}">${pos.status.replace('_', ' ')}</span>
+                    <span class="region">${pos.destinationRegion || ''}</span>
                 </div>
-                ${statusHtml}
-                <div class="position-details">
-                    <div class="detail-row">
-                        <span class="label">Quantity:</span>
-                        <span><strong>${pos.tonnage} MT</strong></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Supplier:</span>
-                        <span>${pos.supplier} (${pos.originPort})</span>
-                    </div>
-                    ${locationHtml}
-                    ${this.renderCostBasis(pos)}
-                    <div class="detail-row">
-                        <span class="label">Terms:</span>
-                        <span>${pos.shippingTerms} | ${pos.exchange}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="label">Purchased:</span>
-                        <span>${pos.purchaseMonth} ${pos.purchasePeriod} (Turn ${pos.purchaseTurn})</span>
+
+                ${locationHtml}
+
+                <div class="timeline-section">
+                    <div class="timeline">
+                        <div class="timeline-point">
+                            <span class="point-label">Purchased</span>
+                            <div class="point-dot ${purchaseDot}"></div>
+                            <span class="point-date">${purchaseInfo.monthName.substring(0,3)} ${purchaseInfo.periodName}</span>
+                        </div>
+                        <div class="timeline-point">
+                            <span class="point-label ${!hasSailed ? 'active' : ''}">${sailedLabel}</span>
+                            <div class="point-dot ${sailedDot}"></div>
+                            <span class="point-date">${sailedInfo.monthName.substring(0,3)} ${sailedInfo.periodName}</span>
+                        </div>
+                        <div class="timeline-point">
+                            <span class="point-label ${hasSailed && !hasArrived ? 'active' : ''}">${arrivalLabel}</span>
+                            <div class="point-dot ${arrivalDot}"></div>
+                            <span class="point-date">${arrivalInfo.monthName.substring(0,3)} ${arrivalInfo.periodName}</span>
+                        </div>
+                        <div class="timeline-point">
+                            <span class="point-label qp">${qpLabel}</span>
+                            <div class="point-dot qp ${qpDot}"></div>
+                            <span class="point-date">${revealMonth.substring(0,3)} Early</span>
+                        </div>
                     </div>
                 </div>
-                ${actionHtml}
+
+                <div class="details-section">
+                    <div class="details-grid">
+                        <div class="detail-cell">
+                            <div class="detail-label">SUPPLIER</div>
+                            <div class="detail-value">${pos.supplier}</div>
+                            <div class="detail-value small">${pos.originPort}</div>
+                        </div>
+                        <div class="detail-cell">
+                            <div class="detail-label">TERMS</div>
+                            <div class="detail-value">${pos.shippingTerms || 'CIF'} | ${pos.exchange || 'LME'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cost-section">
+                    <div class="cost-header ${pos.qpRevealed ? 'locked' : 'provisional'}">${costLabel} Cost</div>
+                    <div class="cost-breakdown">
+                        <span class="val">$${basePrice?.toLocaleString() || '0'}</span> base
+                        <span class="op">+</span>
+                        <span class="val">$${premium?.toLocaleString() || '0'}</span> prem
+                        <span class="op">+</span>
+                        <span class="val">$${freight?.toLocaleString() || '0'}</span> frt
+                    </div>
+                    <div class="cost-total">
+                        <span class="permt">$${pricePerMT?.toLocaleString() || '0'}/MT</span>
+                        <span class="total">$${totalCost?.toLocaleString() || '0'} total</span>
+                    </div>
+                </div>
+
+                <div class="qp-section ${qpSettled ? 'settled' : ''}">
+                    <span class="qp-info">QP: <span class="month">${qpMonth}</span> avg</span>
+                    ${qpRevealHtml}
+                </div>
             </div>
         `;
-    },
-
-    /**
-     * Render cost basis with provisional/final M+1 pricing info
-     */
-    renderCostBasis(pos) {
-        // Check if this position has M+1 pricing info
-        const hasM1Pricing = pos.provisionalBasePrice !== undefined;
-
-        if (!hasM1Pricing) {
-            // Legacy position without M+1 tracking
-            return `
-                <div class="detail-row">
-                    <span class="label">Cost Basis:</span>
-                    <span>$${pos.pricePerMT?.toLocaleString()}/MT ($${pos.totalCost?.toLocaleString()} total)</span>
-                </div>
-            `;
-        }
-
-        // Position has M+1 pricing - check if QP revealed
-        if (pos.qpRevealed) {
-            // QP has been revealed - show final pricing
-            const adjustment = pos.costAdjustment || 0;
-            const adjClass = adjustment <= 0 ? 'positive' : 'negative';
-            const adjSign = adjustment > 0 ? '+' : '';
-            return `
-                <div class="detail-row">
-                    <span class="label">Final Cost:</span>
-                    <span>$${pos.actualPricePerMT?.toLocaleString()}/MT ($${pos.actualTotalCost?.toLocaleString()} total)</span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">M+1 Adjustment:</span>
-                    <span class="${adjClass}">${adjSign}$${adjustment.toLocaleString()} ${adjustment > 0 ? '(cost up)' : adjustment < 0 ? '(cost down)' : ''}</span>
-                </div>
-            `;
-        } else {
-            // QP not yet revealed - show provisional with pending notice
-            // qpMonthIndex = M+1 (the month whose average we need, e.g., February for January trade)
-            // revealMonthIndex = M+2 (when the reveal happens, e.g., March for January trade)
-            const qpMonthIndex = pos.qpMonthIndex || (TimeManager.MONTHS.indexOf(pos.purchaseMonth) + 1);
-            const revealMonthIndex = qpMonthIndex + 1;
-            const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
-            const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
-            return `
-                <div class="detail-row">
-                    <span class="label">Provisional Cost:</span>
-                    <span>$${pos.pricePerMT?.toLocaleString()}/MT ($${pos.totalCost?.toLocaleString()} total)</span>
-                </div>
-                <div class="detail-row qp-pending-row">
-                    <span class="label">Final Price:</span>
-                    <span class="qp-pending-badge">⏳ PENDING - ${qpMonth} avg reveals ${revealMonth} Early</span>
-                </div>
-            `;
-        }
     }
 };
 
