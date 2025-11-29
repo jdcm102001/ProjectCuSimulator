@@ -1684,8 +1684,10 @@ const PositionsWidget = {
         const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
 
         // Determine timeline stage - only mark completed when actually completed
+        // Sailed happens 1 turn after purchase
         const hasSailed = currentTurn >= sailedTurn;
-        const hasArrived = isArrived || isSold || currentTurn >= pos.arrivalTurn;
+        // Arrived only when status is actually ARRIVED or SOLD (not just based on turn)
+        const hasArrived = isArrived || isSold;
         const qpSettled = pos.qpRevealed === true;
 
         // Find linked sale record for sold positions
