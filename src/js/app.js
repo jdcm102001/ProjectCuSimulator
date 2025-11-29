@@ -2331,7 +2331,7 @@ const AnalyticsWidget = {
      * Render the analytics widget - 4-card live trading dashboard
      */
     render() {
-        const container = document.getElementById('content4');
+        const container = document.getElementById('analyticsContainer');
         if (!container) return;
 
         // Render the 4-card layout - Bloomberg minimal style
