@@ -38,14 +38,14 @@ window.JUNE_DATA = {
       "SPOT_AVG": 10100,
       "FUTURES_1M": 10050,
       "FUTURES_3M": 10000,
-      "FUTURES_12M": 9850,
+      "FUTURES_6M": 9850,
       "CURVE_STRUCTURE": "Mild Backwardation"
     },
     "COMEX": {
       "SPOT_AVG": 11005,
       "FUTURES_1M": 10955,
       "FUTURES_3M": 10905,
-      "FUTURES_12M": 10755,
+      "FUTURES_6M": 10755,
       "CURVE_STRUCTURE": "Mild Backwardation"
     },
     "M_PLUS_1": {

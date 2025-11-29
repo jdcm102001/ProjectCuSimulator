@@ -32,14 +32,14 @@ window.MARCH_DATA = {
       "SPOT_AVG": 9654,
       "FUTURES_1M": 9774,
       "FUTURES_3M": 9964,
-      "FUTURES_12M": 10354,
+      "FUTURES_6M": 10354,
       "CURVE_STRUCTURE": "Strong Contango"
     },
     "COMEX": {
       "SPOT_AVG": 10701,
       "FUTURES_1M": 10821,
       "FUTURES_3M": 11011,
-      "FUTURES_12M": 11401,
+      "FUTURES_6M": 11401,
       "CURVE_STRUCTURE": "Strong Contango"
     },
     "M_PLUS_1": {

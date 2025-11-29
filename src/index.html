@@ -8,6 +8,10 @@
     <!-- Single CSS file -->
     <link rel="stylesheet" href="css/style.css">
 
+    <!-- Admin Panel CSS -->
+    <link rel="stylesheet" href="css/admin-panel.css">
+    <link rel="stylesheet" href="css/timeline-editor.css">
+
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
@@ -24,6 +28,787 @@
     <script src="data/june.js"></script>
 </head>
 <body>
+    <!-- ============================================================
+         ADMIN LOGIN SCREEN
+         ============================================================ -->
+    <div class="admin-login" id="adminLogin" style="display: none;">
+        <div class="admin-login-box">
+            <h2>Admin Access</h2>
+            <input type="password" id="adminPassword" placeholder="Enter password">
+            <button id="adminLoginBtn">LOGIN</button>
+            <div class="admin-error" id="adminError" style="display:none;">
+                Incorrect password
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         SCENARIO SELECTION SCREEN
+         ============================================================ -->
+    <div class="scenario-selection" id="scenarioSelection" style="display: none;">
+        <div class="scenario-selection-box">
+            <h2>Select Simulation</h2>
+            <div id="scenarioList">
+                <!-- Populated by JavaScript -->
+            </div>
+            <div class="scenario-selection-footer">
+                <button id="openAdminBtn">OPEN ADMIN PANEL</button>
+                <button id="startGameBtn">START GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         ADMIN PANEL (Full Screen Overlay)
+         ============================================================ -->
+    <div class="admin-panel" id="adminPanel" style="display: none;">
+        <div class="admin-header">
+            <h1>Admin Panel - Simulation Builder</h1>
+            <button class="admin-close" id="adminClose">X</button>
+        </div>
+
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-tab="pricing">PRICING</button>
+            <button class="admin-tab" data-tab="supply">SUPPLY</button>
+            <button class="admin-tab" data-tab="demand">DEMAND</button>
+            <button class="admin-tab" data-tab="events">EVENTS</button>
+            <button class="admin-tab" data-tab="settings">SETTINGS</button>
+            <button class="admin-tab" data-tab="preview">PREVIEW</button>
+        </div>
+
+        <div class="admin-content">
+            <!-- PRICING TAB -->
+            <div class="tab-content active" id="tab-pricing">
+                <h2>Spot Price Configuration</h2>
+                <p class="tab-description">
+                    Drag points on the graph to set monthly average spot prices.
+                    Early/Late prices can be fine-tuned in the fields below.
+                </p>
+
+                <div class="price-graph-container">
+                    <canvas id="priceGraph" width="900" height="350"></canvas>
+                </div>
+
+                <div class="price-legend">
+                    <span class="legend-item lme">&#9679; LME Spot</span>
+                    <span class="legend-item comex">&#9679; COMEX Spot</span>
+                </div>
+
+                <div class="price-fields">
+                    <div class="month-prices" data-month="1">
+                        <h4>JANUARY</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="8960">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="8960">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="8960">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="9344">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="9344">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="9344">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="2">
+                        <h4>FEBRUARY</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9117">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9100">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9134">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10229">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10200">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10258">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="3">
+                        <h4>MARCH</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9075">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9050">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9100">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10187">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10150">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10224">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="4">
+                        <h4>APRIL</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9138">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9120">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9156">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10210">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10180">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10240">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="5">
+                        <h4>MAY</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9200">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9180">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9220">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10300">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10270">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10330">
+                        </div>
+                    </div>
+                    <div class="month-prices" data-month="6">
+                        <h4>JUNE</h4>
+                        <div class="price-row">
+                            <label>LME Avg:</label>
+                            <input type="number" class="lme-avg lme-input" value="9280">
+                            <label>Early:</label>
+                            <input type="number" class="lme-early lme-input" value="9260">
+                            <label>Late:</label>
+                            <input type="number" class="lme-late lme-input" value="9300">
+                        </div>
+                        <div class="price-row">
+                            <label>COMEX Avg:</label>
+                            <input type="number" class="comex-avg comex-input" value="10380">
+                            <label>Early:</label>
+                            <input type="number" class="comex-early comex-input" value="10350">
+                            <label>Late:</label>
+                            <input type="number" class="comex-late comex-input" value="10410">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUPPLY TAB -->
+            <div class="tab-content" id="tab-supply">
+                <h2>Supply Configuration</h2>
+                <p class="tab-description">
+                    Configure one supplier per month. Select supplier and customize tonnage, premium, and exchange.
+                </p>
+                <div class="config-grid" id="supplyConfig">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- DEMAND TAB -->
+            <div class="tab-content" id="tab-demand">
+                <h2>Demand Configuration</h2>
+                <p class="tab-description">
+                    Configure one buyer per month. Exchange and port are determined by the buyer's region.
+                </p>
+                <div class="config-grid" id="demandConfig">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- EVENTS TAB - TIMELINE EDITOR -->
+            <div class="tab-content" id="tab-events">
+                <div class="timeline-editor" id="timelineEditor">
+
+                  <!-- TOP TOOLBAR -->
+                  <div class="timeline-toolbar">
+                    <div class="toolbar-left">
+                      <button class="toolbar-btn" id="undoBtn" onclick="TimelineEditor.undo()" title="Undo (Ctrl+Z)" disabled>
+                        ↶ Undo
+                      </button>
+                      <div class="toolbar-divider"></div>
+                      <button class="toolbar-btn" onclick="TimelineEditor.zoomIn()" title="Zoom In">
+                        🔍+
+                      </button>
+                      <button class="toolbar-btn" onclick="TimelineEditor.zoomOut()" title="Zoom Out">
+                        🔍−
+                      </button>
+                      <button class="toolbar-btn" onclick="TimelineEditor.zoomFit()" title="Fit All">
+                        ⊡
+                      </button>
+                      <span class="zoom-level" id="zoomLevel">100%</span>
+                    </div>
+                    <div class="toolbar-center">
+                      <span class="toolbar-title">Event Timeline</span>
+                    </div>
+                    <div class="toolbar-right">
+                      <button class="toolbar-btn" onclick="TimelineEditor.validateEvents()">
+                        ✓ Validate
+                      </button>
+                      <button class="toolbar-btn primary" onclick="TimelineEditor.openGraphsPanel()">
+                        📊 View Graphs
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- MAIN TIMELINE AREA -->
+                  <div class="timeline-main">
+
+                    <!-- EVENT PALETTE (Left sidebar) -->
+                    <div class="timeline-palette" id="timelinePalette">
+                      <h4>Events</h4>
+
+                      <div class="palette-section">
+                        <div class="palette-label">Templates</div>
+
+                        <div class="palette-item" draggable="true" data-template="mine-strike">
+                          <span class="palette-icon">⛏️</span>
+                          <span class="palette-name">Mine Strike</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-template="stimulus">
+                          <span class="palette-icon">💰</span>
+                          <span class="palette-name">Stimulus</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-template="rate-hike">
+                          <span class="palette-icon">🏦</span>
+                          <span class="palette-name">Rate Hike</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-template="port-strike">
+                          <span class="palette-icon">🚢</span>
+                          <span class="palette-name">Port Strike</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-template="demand-surge">
+                          <span class="palette-icon">📈</span>
+                          <span class="palette-name">Demand Surge</span>
+                        </div>
+                      </div>
+
+                      <div class="palette-section">
+                        <div class="palette-label">Custom</div>
+
+                        <div class="palette-item" draggable="true" data-type="price">
+                          <span class="palette-icon">💵</span>
+                          <span class="palette-name">Price Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="supply">
+                          <span class="palette-icon">📦</span>
+                          <span class="palette-name">Supply Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="demand">
+                          <span class="palette-icon">🏭</span>
+                          <span class="palette-name">Demand Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="logistics">
+                          <span class="palette-icon">🚢</span>
+                          <span class="palette-name">Logistics Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="financial">
+                          <span class="palette-icon">🏦</span>
+                          <span class="palette-name">Financial Event</span>
+                        </div>
+
+                        <div class="palette-item" draggable="true" data-type="news">
+                          <span class="palette-icon">📰</span>
+                          <span class="palette-name">News Item</span>
+                        </div>
+                      </div>
+
+                      <div class="palette-hint">
+                        Drag to timeline or double-click track to create
+                      </div>
+                    </div>
+
+                    <!-- TIMELINE TRACKS -->
+                    <div class="timeline-container" id="timelineContainer">
+
+                      <!-- TIME HEADER (Fixed at top) -->
+                      <div class="timeline-header" id="timelineHeader">
+                        <div class="track-label-spacer"></div>
+                        <div class="time-markers" id="timeMarkers">
+                          <!-- Generated dynamically -->
+                        </div>
+                      </div>
+
+                      <!-- SCROLLABLE TRACKS AREA -->
+                      <div class="timeline-tracks-wrapper" id="timelineTracksWrapper">
+                        <div class="timeline-tracks" id="timelineTracks">
+
+                          <!-- TRACK: PRICE -->
+                          <div class="timeline-track" data-track="price">
+                            <div class="track-label">
+                              <span class="track-icon">💵</span>
+                              <span class="track-name">Price</span>
+                            </div>
+                            <div class="track-content" data-track="price">
+                              <!-- Event bars rendered here -->
+                            </div>
+                          </div>
+
+                          <!-- TRACK: SUPPLY -->
+                          <div class="timeline-track" data-track="supply">
+                            <div class="track-label">
+                              <span class="track-icon">📦</span>
+                              <span class="track-name">Supply</span>
+                            </div>
+                            <div class="track-content" data-track="supply">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: DEMAND -->
+                          <div class="timeline-track" data-track="demand">
+                            <div class="track-label">
+                              <span class="track-icon">🏭</span>
+                              <span class="track-name">Demand</span>
+                            </div>
+                            <div class="track-content" data-track="demand">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: LOGISTICS -->
+                          <div class="timeline-track" data-track="logistics">
+                            <div class="track-label">
+                              <span class="track-icon">🚢</span>
+                              <span class="track-name">Logistics</span>
+                            </div>
+                            <div class="track-content" data-track="logistics">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: FINANCIAL -->
+                          <div class="timeline-track" data-track="financial">
+                            <div class="track-label">
+                              <span class="track-icon">🏦</span>
+                              <span class="track-name">Financial</span>
+                            </div>
+                            <div class="track-content" data-track="financial">
+                            </div>
+                          </div>
+
+                          <!-- TRACK: NEWS -->
+                          <div class="timeline-track" data-track="news">
+                            <div class="track-label">
+                              <span class="track-icon">📰</span>
+                              <span class="track-name">News</span>
+                            </div>
+                            <div class="track-content" data-track="news">
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <!-- PROPERTIES PANEL (Slides in when event selected) -->
+                  <div class="properties-panel" id="propertiesPanel">
+                    <div class="properties-header">
+                      <span class="properties-title" id="propertiesTitle">Event Properties</span>
+                      <button class="properties-close" onclick="TimelineEditor.closeProperties()">×</button>
+                    </div>
+                    <div class="properties-body" id="propertiesBody">
+                      <!-- Dynamically populated based on selected event -->
+                    </div>
+                    <div class="properties-footer">
+                      <button class="btn-danger" onclick="TimelineEditor.deleteSelectedEvent()">Delete Event</button>
+                    </div>
+                  </div>
+
+                  <!-- GRAPHS PANEL (Collapsible side panel) -->
+                  <div class="graphs-panel" id="graphsPanel">
+                    <div class="graphs-panel-header">
+                      <span>📊 Live Preview</span>
+                      <button class="graphs-panel-close" onclick="TimelineEditor.closeGraphsPanel()">×</button>
+                    </div>
+                    <div class="graphs-panel-body">
+                      <div class="graph-mini" id="graphMiniPrice">
+                        <div class="graph-mini-title">Prices</div>
+                        <canvas id="canvasMiniPrice" width="250" height="100"></canvas>
+                      </div>
+                      <div class="graph-mini" id="graphMiniSupply">
+                        <div class="graph-mini-title">Supply & Demand</div>
+                        <canvas id="canvasMiniSupply" width="250" height="100"></canvas>
+                      </div>
+                      <div class="graph-mini" id="graphMiniLogistics">
+                        <div class="graph-mini-title">Shipping</div>
+                        <canvas id="canvasMiniLogistics" width="250" height="100"></canvas>
+                      </div>
+                      <div class="graph-mini" id="graphMiniFinancial">
+                        <div class="graph-mini-title">Financial</div>
+                        <canvas id="canvasMiniFinancial" width="250" height="100"></canvas>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- NAME PROMPT MODAL -->
+                  <div class="name-modal" id="nameModal">
+                    <div class="name-modal-content">
+                      <h3>Name Your Event</h3>
+                      <input type="text" id="eventNameInput" placeholder="e.g., Mine Strike, China Stimulus...">
+                      <div class="name-modal-actions">
+                        <button class="btn-secondary" onclick="TimelineEditor.cancelNamePrompt()">Cancel</button>
+                        <button class="btn-primary" onclick="TimelineEditor.confirmNamePrompt()">Create</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- CONTEXT MENU -->
+                  <div class="context-menu" id="contextMenu">
+                    <div class="context-menu-item" onclick="TimelineEditor.editSelectedEvent()">
+                      <span>✏️</span> Edit
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.duplicateSelectedEvent()">
+                      <span>📋</span> Duplicate
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('price')">
+                      <span>💵</span> Add Price Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('supply')">
+                      <span>📦</span> Add Supply Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('demand')">
+                      <span>🏭</span> Add Demand Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('logistics')">
+                      <span>🚢</span> Add Logistics Effect
+                    </div>
+                    <div class="context-menu-item" onclick="TimelineEditor.addEffectToTrack('financial')">
+                      <span>🏦</span> Add Financial Effect
+                    </div>
+                    <div class="context-menu-divider"></div>
+                    <div class="context-menu-item danger" onclick="TimelineEditor.deleteSelectedEvent()">
+                      <span>🗑️</span> Delete
+                    </div>
+                  </div>
+
+                </div>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div class="tab-content" id="tab-settings">
+                <h2>Simulation Settings</h2>
+
+                <div class="settings-section">
+                    <h3>Simulation Info</h3>
+                    <div class="settings-row">
+                        <label>Name:</label>
+                        <input type="text" id="simName" value="Custom Simulation" maxlength="50">
+                    </div>
+                    <div class="settings-row">
+                        <label>Description:</label>
+                        <textarea id="simDescription" rows="3" maxlength="300">A custom trading simulation scenario.</textarea>
+                    </div>
+                    <div class="settings-row">
+                        <label>Difficulty:</label>
+                        <select id="simDifficulty">
+                            <option value="Easy">Easy</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="Hard">Hard</option>
+                            <option value="Custom">Custom</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Financial Settings</h3>
+                    <div class="settings-row">
+                        <label>Starting Practice Funds:</label>
+                        <input type="number" id="startingFunds" value="200000" min="10000" max="10000000">
+                        <span class="unit">$</span>
+                    </div>
+                    <div class="settings-row">
+                        <label>LOC Limit:</label>
+                        <input type="number" id="locLimit" value="200000" min="0" max="10000000">
+                        <span class="unit">$</span>
+                    </div>
+                    <div class="settings-row">
+                        <label>Annual Interest Rate (SOFR):</label>
+                        <input type="number" id="interestRate" value="4.32" min="0" max="20" step="0.01">
+                        <span class="unit">%</span>
+                    </div>
+                    <div class="settings-row">
+                        <label>Margin Requirement:</label>
+                        <input type="number" id="marginRequirement" value="100000" min="0" max="10000000">
+                        <span class="unit">$</span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Game Settings</h3>
+                    <div class="settings-row">
+                        <label>Timer per Period:</label>
+                        <input type="number" id="timerMinutes" value="10" min="1" max="60">
+                        <span class="unit">minutes</span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Admin Settings</h3>
+                    <div class="settings-row">
+                        <label>Change Password:</label>
+                        <div class="password-change-row">
+                            <input type="password" id="currentPassword" placeholder="Current">
+                            <input type="password" id="newPassword" placeholder="New">
+                            <input type="password" id="confirmPassword" placeholder="Confirm">
+                            <button id="updatePasswordBtn">UPDATE</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PREVIEW TAB -->
+            <div class="tab-content" id="tab-preview">
+                <h2>Simulation Preview</h2>
+                <p class="tab-description">
+                    Review all settings before saving. Fix any errors shown below.
+                </p>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4CB;</span> Simulation Info</h3>
+                    <div class="preview-row">
+                        <span class="label">Name:</span>
+                        <span class="value" id="previewName">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">Description:</span>
+                        <span class="value" id="previewDescription">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">Difficulty:</span>
+                        <span class="value" id="previewDifficulty">-</span>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4C8;</span> Pricing Summary</h3>
+                    <div class="preview-mini-graph" id="previewPriceGraph"></div>
+                    <div class="preview-row">
+                        <span class="label">LME Range:</span>
+                        <span class="value" id="previewLmeRange">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">COMEX Range:</span>
+                        <span class="value" id="previewComexRange">-</span>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4E6;</span> Supply by Month</h3>
+                    <ul class="preview-list" id="previewSupplyList"></ul>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F3ED;</span> Demand by Month</h3>
+                    <ul class="preview-list" id="previewDemandList"></ul>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F3AD;</span> Events (<span id="previewEventsCount">0</span> total)</h3>
+                    <ul class="preview-list" id="previewEventsList"></ul>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x1F4B0;</span> Financial Settings</h3>
+                    <div class="preview-row">
+                        <span class="label">Starting Funds:</span>
+                        <span class="value" id="previewFunds">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">LOC Limit:</span>
+                        <span class="value" id="previewLoc">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <span class="label">Interest Rate:</span>
+                        <span class="value" id="previewInterest">-</span>
+                    </div>
+                </div>
+
+                <div class="preview-section">
+                    <h3><span class="icon">&#x26A0;</span> Validation</h3>
+                    <div class="validation-results" id="validationResults">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-footer">
+            <div class="save-controls">
+                <label>Save to:</label>
+                <select id="saveSlotSelect">
+                    <option value="1">Slot 1</option>
+                    <option value="2">Slot 2</option>
+                    <option value="3">Slot 3</option>
+                </select>
+                <button id="saveSimBtn">SAVE</button>
+                <button id="resetDefaultsBtn">RESET TO DEFAULTS</button>
+                <button id="deleteSimBtn">DELETE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         EVENT CREATION/EDIT MODAL
+         ============================================================ -->
+    <div class="event-modal" id="eventModal" style="display: none;">
+        <div class="event-modal-content">
+            <h3 id="eventModalTitle">Create Event</h3>
+
+            <div class="event-form-group">
+                <label>Event Name:</label>
+                <input type="text" id="eventName" placeholder="e.g., China Stimulus Package" maxlength="40">
+            </div>
+
+            <div class="event-form-group">
+                <label>Event Types (select all that apply):</label>
+                <div class="event-types-checkboxes" id="eventTypesCheckboxes">
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="price" checked>
+                        <span class="type-icon">📈</span> Price
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="supply">
+                        <span class="type-icon">📦</span> Supply
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="demand">
+                        <span class="type-icon">🏭</span> Demand
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="logistics">
+                        <span class="type-icon">🚢</span> Logistics
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="financial">
+                        <span class="type-icon">🏦</span> Financial
+                    </label>
+                    <label class="event-type-checkbox">
+                        <input type="checkbox" name="eventTypes" value="news">
+                        <span class="type-icon">📰</span> News
+                    </label>
+                </div>
+            </div>
+
+            <!-- Dynamic effects based on selected types -->
+            <div class="event-form-group" id="eventEffectsSection">
+                <label>Type-Specific Effects:</label>
+                <div id="eventEffectsContainer">
+                    <!-- Populated dynamically based on selected types -->
+                </div>
+            </div>
+
+            <div class="event-form-group">
+                <label>Description:</label>
+                <textarea id="eventDescription" placeholder="Brief description of the event..." maxlength="200"></textarea>
+            </div>
+
+            <div class="event-form-group">
+                <label>Start Period:</label>
+                <select id="eventStartPeriod">
+                    <option value="1">Jan-Early</option>
+                    <option value="2">Jan-Late</option>
+                    <option value="3">Feb-Early</option>
+                    <option value="4">Feb-Late</option>
+                    <option value="5">Mar-Early</option>
+                    <option value="6">Mar-Late</option>
+                    <option value="7">Apr-Early</option>
+                    <option value="8">Apr-Late</option>
+                    <option value="9">May-Early</option>
+                    <option value="10">May-Late</option>
+                    <option value="11">Jun-Early</option>
+                    <option value="12">Jun-Late</option>
+                </select>
+            </div>
+
+            <div class="event-form-group">
+                <label>End Period:</label>
+                <select id="eventEndPeriod">
+                    <option value="1">Jan-Early</option>
+                    <option value="2">Jan-Late</option>
+                    <option value="3">Feb-Early</option>
+                    <option value="4" selected>Feb-Late</option>
+                    <option value="5">Mar-Early</option>
+                    <option value="6">Mar-Late</option>
+                    <option value="7">Apr-Early</option>
+                    <option value="8">Apr-Late</option>
+                    <option value="9">May-Early</option>
+                    <option value="10">May-Late</option>
+                    <option value="11">Jun-Early</option>
+                    <option value="12">Jun-Late</option>
+                </select>
+            </div>
+
+            <div class="event-form-group">
+                <label>Market Sentiment:</label>
+                <div class="sentiment-options">
+                    <label class="sentiment-option bullish">
+                        <input type="radio" name="eventSentiment" value="bullish" checked>
+                        Bullish (prices up)
+                    </label>
+                    <label class="sentiment-option bearish">
+                        <input type="radio" name="eventSentiment" value="bearish">
+                        Bearish (prices down)
+                    </label>
+                    <label class="sentiment-option neutral">
+                        <input type="radio" name="eventSentiment" value="neutral">
+                        Neutral
+                    </label>
+                </div>
+            </div>
+
+            <div class="event-form-group">
+                <label>Severity:</label>
+                <select id="eventSeverity">
+                    <option value="minor">Minor (5% impact)</option>
+                    <option value="medium" selected>Medium (10% impact)</option>
+                    <option value="high">High (15% impact)</option>
+                    <option value="significant">Significant (25% impact)</option>
+                </select>
+            </div>
+
+            <div class="event-impacts">
+                <h4>Calculated Price Impacts (during event):</h4>
+                <div id="eventImpactsPreview">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="event-modal-actions">
+                <button class="event-save-btn" id="eventSaveBtn">SAVE EVENT</button>
+                <button class="event-delete-btn" id="eventDeleteBtn" style="display: none;">DELETE</button>
+                <button class="event-cancel-btn" id="eventCancelBtn">CANCEL</button>
+            </div>
+        </div>
+    </div>
+
     <!-- HEADER BAR (Fixed, Static) -->
     <header id="header">
         <div class="metric">
@@ -50,7 +835,30 @@
             <span class="label">LOC Used</span>
             <span class="value" id="headerLOC">$0 / $200K</span>
         </div>
+        <div class="metric qp-metric" id="headerQPMetric" style="display: none;">
+            <span class="label">Pending QP</span>
+            <span class="value qp-pending" id="headerQPPending">0 sales</span>
+        </div>
+
+        <!-- Notification Bell -->
+        <div class="notification-bell" id="notificationBell">
+            <span class="bell-icon">🔔</span>
+            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+
+            <!-- Dropdown Panel -->
+            <div class="notification-dropdown" id="notificationDropdown" style="display: none;">
+                <div class="notification-header">
+                    <span class="notification-title">Notifications</span>
+                    <button class="mark-all-read" id="markAllReadBtn">Mark All Read</button>
+                </div>
+                <div class="notification-list" id="notificationList">
+                    <div class="notification-empty">No notifications</div>
+                </div>
+            </div>
+        </div>
+
         <button id="nextTurnBtn">NEXT TURN</button>
+        <button id="debugBtn" onclick="EnhancedDebugPanel.toggle()" style="background:#333;color:#4caf50;">DEBUG</button>
     </header>
 
     <!-- MAIN CONTAINER -->
@@ -66,6 +874,9 @@
                 <li data-widget="Analytics">Analytics</li>
                 <li data-widget="HedgeStatus">Hedge Status</li>
             </ul>
+            <div id="bankContent">
+                <!-- Bank widget renders here -->
+            </div>
         </aside>
 
         <!-- WORKSPACE (2x2 Grid) -->
@@ -107,7 +918,7 @@
                 </div>
             </div>
 
-            <!-- Panel 4: Analytics + Hedge Status -->
+            <!-- Panel 4: Analytics / Hedge Status -->
             <div class="panel" id="panel4">
                 <div class="panel-header">
                     <div class="tabs">
@@ -119,7 +930,9 @@
                     <div id="analyticsContainer">
                         <canvas id="futuresChart"></canvas>
                     </div>
-                    <div id="hedgeStatusContainer" style="display:none;"></div>
+                    <div id="hedgeStatusContainer" style="display: none;">
+                        <!-- Hedge Status widget renders here -->
+                    </div>
                 </div>
             </div>
         </main>
@@ -198,18 +1011,41 @@
             <button class="close-btn" onclick="TradePanel.close()">&times;</button>
         </div>
         <div class="trade-panel-body">
-            <div class="info-row">
-                <span class="label">Buyer:</span>
-                <span class="value" id="sellBuyer">-</span>
+            <!-- Cargo Location Section -->
+            <div class="sell-location-section" id="sellLocationSection">
+                <div class="location-header">CARGO LOCATION</div>
+                <div class="info-row">
+                    <span class="label">Current Port:</span>
+                    <span class="value highlight" id="sellCargoPort">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Region:</span>
+                    <span class="value" id="sellCargoRegion">-</span>
+                </div>
             </div>
-            <div class="info-row">
-                <span class="label">Destination:</span>
-                <span class="value" id="sellDest">-</span>
+
+            <!-- Buyer Section -->
+            <div class="sell-buyer-section">
+                <div class="location-header">BUYER</div>
+                <div class="info-row">
+                    <span class="label">Buyer:</span>
+                    <span class="value" id="sellBuyer">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Destination:</span>
+                    <span class="value" id="sellDest">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Premium:</span>
+                    <span class="value" id="sellPremiumInfo">-</span>
+                </div>
             </div>
-            <div class="info-row">
-                <span class="label">Premium:</span>
-                <span class="value" id="sellPremiumInfo">-</span>
+
+            <!-- Region Match Indicator -->
+            <div class="region-match-section" id="regionMatchSection">
+                <div id="regionMatchIndicator" class="region-match-indicator">-</div>
             </div>
+
             <div class="form-group">
                 <label>Select Inventory</label>
                 <select id="sellInventory">
@@ -222,11 +1058,11 @@
             </div>
             <div class="calc-section">
                 <div class="calc-row">
-                    <span>Sale Price:</span>
+                    <span>Sale Price (Est.):</span>
                     <span id="sellPrice">$0</span>
                 </div>
                 <div class="calc-row">
-                    <span>Total Revenue:</span>
+                    <span>Est. Revenue:</span>
                     <span id="sellRevenue">$0</span>
                 </div>
                 <div class="calc-row">
@@ -234,10 +1070,21 @@
                     <span id="sellCost">$0</span>
                 </div>
                 <div class="calc-row total">
-                    <span>Profit:</span>
+                    <span>Est. Profit:</span>
                     <span id="sellProfit">$0</span>
                 </div>
             </div>
+
+            <!-- QP Warning -->
+            <div class="qp-warning" id="qpWarning">
+                <div class="qp-warning-icon">!</div>
+                <div class="qp-warning-text">
+                    <strong>M+1 Pricing</strong><br>
+                    Final price will be revealed at <span id="qpRevealDate">-</span>.<br>
+                    Profit is estimated and subject to adjustment.
+                </div>
+            </div>
+
             <button id="executeSellBtn" onclick="TradePanel.executeSell()">SELL COPPER</button>
         </div>
     </div>
@@ -288,38 +1135,109 @@
         </div>
     </div>
 
-    <!-- Hedge Link Modal -->
-    <div id="hedgeLinkModal" class="modal-backdrop" style="display:none;">
-        <div class="modal">
-            <div class="modal-header">Link as Hedge?</div>
+    <!-- BANK DRAW PANEL -->
+    <div id="bankDrawPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header bank">
+            <span>Draw from Line of Credit</span>
+            <button class="close-btn" onclick="BankWidget.closePanel()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Available Credit:</span>
+                <span class="value positive" id="bankDrawMax">$0</span>
+            </div>
+            <div class="form-group">
+                <label>Amount to Draw ($)</label>
+                <input type="number" id="bankDrawAmount" min="1000" step="1000" value="50000" oninput="BankWidget.updateDrawCalc()">
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>New Practice Funds:</span>
+                    <span id="bankDrawNewFunds">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>New LOC Balance:</span>
+                    <span id="bankDrawNewLoc">$0</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Est. Monthly Interest:</span>
+                    <span id="bankDrawInterest">$0</span>
+                </div>
+            </div>
+            <button id="executeBankDrawBtn" onclick="BankWidget.executeDraw()">DRAW FUNDS</button>
+        </div>
+    </div>
+
+    <!-- BANK REPAY PANEL -->
+    <div id="bankRepayPanel" class="trade-panel" style="display: none;">
+        <div class="trade-panel-header bank repay">
+            <span>Repay Line of Credit</span>
+            <button class="close-btn" onclick="BankWidget.closePanel()">&times;</button>
+        </div>
+        <div class="trade-panel-body">
+            <div class="info-row">
+                <span class="label">Outstanding Balance:</span>
+                <span class="value negative" id="bankRepayOutstanding">$0</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Max Repayment:</span>
+                <span class="value" id="bankRepayMax">$0</span>
+            </div>
+            <div class="form-group">
+                <label>Amount to Repay ($)</label>
+                <input type="number" id="bankRepayAmount" min="1000" step="1000" value="50000" oninput="BankWidget.updateRepayCalc()">
+            </div>
+            <div class="calc-section">
+                <div class="calc-row">
+                    <span>New Practice Funds:</span>
+                    <span id="bankRepayNewFunds">$0</span>
+                </div>
+                <div class="calc-row">
+                    <span>New LOC Balance:</span>
+                    <span id="bankRepayNewLoc">$0</span>
+                </div>
+                <div class="calc-row total">
+                    <span>Monthly Interest Savings:</span>
+                    <span id="bankRepaySavings" class="positive">$0</span>
+                </div>
+            </div>
+            <button id="executeBankRepayBtn" onclick="BankWidget.executeRepay()">REPAY LOAN</button>
+        </div>
+    </div>
+
+    <!-- HEDGE LINK MODAL -->
+    <div id="hedgeLinkModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content hedge-link-modal">
+            <div class="modal-header">
+                <h3>Link Futures to Physical Position</h3>
+                <button class="close-btn" onclick="HedgeStatusWidget.closeModal()">&times;</button>
+            </div>
             <div class="modal-body">
-                <p>Connect this futures position to your physical cargo?</p>
-                <div class="link-preview">
-                    <div class="row">
-                        <span class="label">Physical:</span>
-                        <span id="modalPhysicalDetails">—</span>
-                    </div>
-                    <div class="row">
-                        <span class="label">Pricing:</span>
-                        <span id="modalPricing">—</span>
-                    </div>
-                </div>
-                <div class="link-arrow">↓ Link to ↓</div>
-                <div class="link-preview">
-                    <div class="row">
-                        <span class="label">Futures:</span>
-                        <span id="modalFuturesDetails">—</span>
-                    </div>
-                </div>
-                <div class="modal-buttons">
-                    <button class="modal-btn" onclick="HedgeStatusWidget.confirmLink()">Yes, Link</button>
-                    <button class="modal-btn cancel" onclick="document.getElementById('hedgeLinkModal').style.display='none'">Cancel</button>
+                <p class="modal-instruction">Select a futures position to link as a hedge:</p>
+                <div id="availableFuturesList" class="futures-select-list">
+                    <!-- Futures list populates here -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Main Application Script -->
-    <script src="js/app.js"></script>
+    <!-- Scenario Loader - Bridge between admin panel and game -->
+    <script src="js/core/scenario-loader.js?v=1"></script>
+
+    <!-- Main Application Script (cache-bust) -->
+    <script src="js/app.js?v=15"></script>
+
+    <!-- Enhanced Debug Panel (Development Only) -->
+    <script src="js/debug/debug-panel.js?v=5"></script>
+
+    <!-- Admin Panel Scripts -->
+    <script src="js/admin/admin-storage.js?v=2"></script>
+    <script src="js/admin/admin-pricing.js?v=2"></script>
+    <script src="js/admin/admin-events.js?v=2"></script>
+    <!-- New Event Builder System -->
+    <script src="js/admin/timeline-graphs.js?v=1"></script>
+    <script src="js/admin/timeline-editor.js?v=1"></script>
+    <script src="js/admin/save-load-debug.js?v=1"></script>
+    <script src="js/admin/admin-panel.js?v=2"></script>
 </body>
 </html>

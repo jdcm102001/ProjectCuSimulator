@@ -10,8 +10,8 @@ window.APRIL_DATA = {
     "DEMAND": {"AMERICAS": {"DEMAND_MT": 90}, "ASIA": {"DEMAND_MT": 85}, "EUROPE": {"DEMAND_MT": 55}, "TOTAL_DEMAND_MT": 230}
   },
   "PRICING": {
-    "LME": {"SPOT_AVG": 9138, "FUTURES_1M": 9338, "FUTURES_3M": 9388, "FUTURES_12M": 9738, "CURVE_STRUCTURE": "Strong Contango"},
-    "COMEX": {"SPOT_AVG": 10210, "FUTURES_1M": 10410, "FUTURES_3M": 10460, "FUTURES_12M": 10810, "CURVE_STRUCTURE": "Strong Contango"},
+    "LME": {"SPOT_AVG": 9138, "FUTURES_1M": 9338, "FUTURES_3M": 9388, "FUTURES_6M": 9738, "CURVE_STRUCTURE": "Strong Contango"},
+    "COMEX": {"SPOT_AVG": 10210, "FUTURES_1M": 10410, "FUTURES_3M": 10460, "FUTURES_6M": 10810, "CURVE_STRUCTURE": "Strong Contango"},
     "M_PLUS_1": {"LME_AVG": 9117, "COMEX_AVG": 10229, "DESCRIPTION": "M+1 (May) average prices - used for both supplier purchase and client sale pricing based on sailing date"}
   },
   "LOGISTICS": {
