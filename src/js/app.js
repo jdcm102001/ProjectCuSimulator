@@ -39,7 +39,7 @@ const GAME_STATE = {
         console.log('[GAME] Initializing...');
 
         // Load all month data (from global variables set by data files)
-        this.allMonthData = [
+        const rawMonthData = [
             window.JANUARY_DATA,
             window.FEBRUARY_DATA,
             window.MARCH_DATA,
@@ -48,12 +48,136 @@ const GAME_STATE = {
             window.JUNE_DATA
         ];
 
+        // Normalize data to expected format
+        this.allMonthData = rawMonthData.map(data => this.normalizeMonthData(data));
+
         // Set current month data
         this.currentMonthData = this.allMonthData[0];
         console.log('[GAME] Current month:', this.currentMonthData.MONTH);
 
         // Update header display
         this.updateHeader();
+    },
+
+    /**
+     * Normalize raw data file format to expected code format
+     */
+    normalizeMonthData(raw) {
+        if (!raw) return null;
+
+        // Build SUPPLIERS from MARKET_DEPTH.SUPPLY
+        const suppliers = {};
+        if (raw.MARKET_DEPTH && raw.MARKET_DEPTH.SUPPLY) {
+            const supply = raw.MARKET_DEPTH.SUPPLY;
+            if (supply.PERUVIAN) {
+                suppliers.PERUVIAN_LTA = {
+                    NAME: 'Peruvian (LTA)',
+                    PORT: supply.PERUVIAN.ORIGIN_PORT,
+                    CURRENT_PRICE: {
+                        PREMIUM: 10, // LTA premium
+                        TONNAGE_RANGE_MT: [5, 5]
+                    }
+                };
+                suppliers.PERUVIAN_SPOT = {
+                    NAME: 'Peruvian (Spot)',
+                    PORT: supply.PERUVIAN.ORIGIN_PORT,
+                    CURRENT_PRICE: {
+                        PREMIUM: supply.PERUVIAN.SUPPLIER_PREMIUM_USD,
+                        TONNAGE_RANGE_MT: [5, supply.PERUVIAN.MAX_OPTIONAL_SPOT_MT || 15]
+                    }
+                };
+            }
+            if (supply.CHILEAN) {
+                suppliers.CHILEAN = {
+                    NAME: 'Chilean (Spot)',
+                    PORT: supply.CHILEAN.ORIGIN_PORT,
+                    CURRENT_PRICE: {
+                        PREMIUM: supply.CHILEAN.SUPPLIER_PREMIUM_USD,
+                        TONNAGE_RANGE_MT: [supply.CHILEAN.MIN_AVAILABLE_MT || 20, supply.CHILEAN.MAX_AVAILABLE_MT || 100]
+                    }
+                };
+            }
+        }
+
+        // Build BUYERS from CLIENTS.OPPORTUNITIES
+        const buyers = {};
+        if (raw.CLIENTS && raw.CLIENTS.OPPORTUNITIES) {
+            raw.CLIENTS.OPPORTUNITIES.forEach(opp => {
+                const key = opp.REGION.toUpperCase();
+                buyers[key] = {
+                    NAME: opp.REGION,
+                    DESTINATION: opp.PORT_OF_DISCHARGE,
+                    PREMIUM: opp.REGIONAL_PREMIUM_USD,
+                    TONNAGE_RANGE_MT: [opp.MIN_QUANTITY_MT, opp.MAX_QUANTITY_MT],
+                    EXCHANGE: opp.REFERENCE_EXCHANGE
+                };
+            });
+        }
+
+        // Build EXCHANGE_PRICES from PRICING
+        const exchangePrices = {
+            LME: {
+                CASH: raw.PRICING?.LME?.SPOT_AVG || 9000,
+                'M+1': raw.PRICING?.LME?.FUTURES_1M || 9100,
+                'M+3': raw.PRICING?.LME?.FUTURES_3M || 9200,
+                'M+12': raw.PRICING?.LME?.FUTURES_12M || 9500
+            },
+            COMEX: {
+                NEARBY: raw.PRICING?.COMEX?.SPOT_AVG || 9300,
+                'M+1': raw.PRICING?.COMEX?.FUTURES_1M || 9400,
+                'M+3': raw.PRICING?.COMEX?.FUTURES_3M || 9600,
+                'M+12': raw.PRICING?.COMEX?.FUTURES_12M || 9900
+            }
+        };
+
+        // Build DESTINATIONS from LOGISTICS.FREIGHT_RATES
+        const destinations = {};
+        if (raw.LOGISTICS && raw.LOGISTICS.FREIGHT_RATES) {
+            // Merge all origin ports' destinations
+            Object.values(raw.LOGISTICS.FREIGHT_RATES).forEach(originData => {
+                Object.entries(originData).forEach(([destKey, destData]) => {
+                    if (!destinations[destKey]) {
+                        destinations[destKey] = {
+                            NAME: destData.PORT_NAME,
+                            COUNTRY: destData.COUNTRY,
+                            DISTANCE_NM: destData.DISTANCE_NM,
+                            TRAVEL_DAYS: destData.TRAVEL_TIME_DAYS,
+                            CIF_RATE: destData.CIF_RATE_USD_PER_TONNE,
+                            FOB_RATE: destData.FOB_RATE_USD_PER_TONNE
+                        };
+                    }
+                });
+            });
+        }
+
+        // Restructure LOGISTICS.FREIGHT_RATES to be indexed by supplier key
+        const freightBySupplier = {};
+        if (raw.LOGISTICS && raw.LOGISTICS.FREIGHT_RATES) {
+            // Map supplier keys to origin ports
+            const supplierPortMap = {
+                'PERUVIAN_LTA': 'CALLAO',
+                'PERUVIAN_SPOT': 'CALLAO',
+                'CHILEAN': 'ANTOFAGASTA'
+            };
+
+            for (const [supplierKey, portName] of Object.entries(supplierPortMap)) {
+                if (raw.LOGISTICS.FREIGHT_RATES[portName]) {
+                    freightBySupplier[supplierKey] = raw.LOGISTICS.FREIGHT_RATES[portName];
+                }
+            }
+        }
+
+        return {
+            ...raw,
+            SUPPLIERS: suppliers,
+            BUYERS: buyers,
+            EXCHANGE_PRICES: exchangePrices,
+            DESTINATIONS: destinations,
+            LOGISTICS: {
+                ...raw.LOGISTICS,
+                FREIGHT_RATES: freightBySupplier
+            }
+        };
     },
 
     /**
