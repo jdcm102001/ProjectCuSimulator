@@ -6,7 +6,7 @@
     <title>Perseverance - Trading Simulator</title>
 
     <!-- Single CSS file -->
-    <link rel="stylesheet" href="css/style.css?v=5">
+    <link rel="stylesheet" href="css/style.css?v=6">
 
     <!-- Admin Panel CSS -->
     <link rel="stylesheet" href="css/admin-panel.css">
@@ -809,37 +809,8 @@
         </div>
     </div>
 
-    <!-- HEADER BAR (Fixed, Static) -->
+    <!-- HEADER BAR (Simplified - Notifications & Next Turn only) -->
     <header id="header">
-        <div class="metric">
-            <span class="label">Period</span>
-            <span class="value" id="headerPeriod">JAN - Early (1/12)</span>
-        </div>
-        <div class="metric">
-            <span class="label">Funds</span>
-            <span class="value" id="headerFunds">$200,000</span>
-        </div>
-        <div class="metric">
-            <span class="label">P&L</span>
-            <span class="value" id="headerPL">$0</span>
-        </div>
-        <div class="metric">
-            <span class="label">Buying Power</span>
-            <span class="value" id="headerBuyingPower">$400,000</span>
-        </div>
-        <div class="metric">
-            <span class="label">Inventory</span>
-            <span class="value" id="headerInventory">0 MT</span>
-        </div>
-        <div class="metric">
-            <span class="label">LOC Used</span>
-            <span class="value" id="headerLOC">$0 / $200K</span>
-        </div>
-        <div class="metric qp-metric" id="headerQPMetric" style="display: none;">
-            <span class="label">Pending QP</span>
-            <span class="value qp-pending" id="headerQPPending">0 sales</span>
-        </div>
-
         <!-- Notification Bell -->
         <div class="notification-bell" id="notificationBell">
             <span class="bell-icon">🔔</span>
@@ -858,24 +829,29 @@
         </div>
 
         <button id="nextTurnBtn">NEXT TURN</button>
-        <button id="debugBtn" onclick="EnhancedDebugPanel.toggle()" style="background:#333;color:#4caf50;">DEBUG</button>
     </header>
 
     <!-- MAIN CONTAINER -->
     <div id="container">
-        <!-- SIDEBAR (Static, No Collapse) -->
+        <!-- SIDEBAR (Key Metrics Display) -->
         <aside id="sidebar">
-            <h3>Widgets</h3>
-            <ul id="widgetList">
-                <li data-widget="Markets">Markets</li>
-                <li data-widget="Positions">Positions</li>
-                <li data-widget="Futures">Futures</li>
-                <li data-widget="Map">Active Map</li>
-                <li data-widget="Analytics">Analytics</li>
-                <li data-widget="HedgeStatus">Hedge Status</li>
-            </ul>
-            <div id="bankContent">
-                <!-- Bank widget renders here -->
+            <div class="sidebar-metrics">
+                <div class="sidebar-metric">
+                    <span class="metric-label">PERIOD</span>
+                    <span class="metric-value" id="sidebarPeriod">JAN - Early (1/12)</span>
+                </div>
+                <div class="sidebar-metric">
+                    <span class="metric-label">FUNDS</span>
+                    <span class="metric-value" id="sidebarFunds">$200,000</span>
+                </div>
+                <div class="sidebar-metric">
+                    <span class="metric-label">P&L</span>
+                    <span class="metric-value" id="sidebarPL">$0</span>
+                </div>
+                <div class="sidebar-metric">
+                    <span class="metric-label">INVENTORY</span>
+                    <span class="metric-value" id="sidebarInventory">0 MT</span>
+                </div>
             </div>
         </aside>
 
@@ -1114,94 +1090,20 @@
             </div>
             <div class="form-group">
                 <label>Number of Contracts</label>
-                <input type="number" id="futuresContracts" min="1" max="11" value="1">
-                <span class="hint">Max: 11 contracts (based on margin)</span>
+                <input type="number" id="futuresContracts" min="1" max="100" value="1">
+                <span class="hint">$25 fee per contract (no margin required)</span>
             </div>
             <div class="calc-section">
                 <div class="calc-row">
-                    <span>Margin Required:</span>
-                    <span id="futuresMargin">$9,000</span>
-                </div>
-                <div class="calc-row">
-                    <span>Opening Fees:</span>
+                    <span>Opening Fee:</span>
                     <span id="futuresFees">$25</span>
                 </div>
                 <div class="calc-row total">
-                    <span>Total Deducted:</span>
-                    <span id="futuresTotal">$9,025</span>
+                    <span>Total Cost:</span>
+                    <span id="futuresTotal">$25</span>
                 </div>
             </div>
             <button id="executeFuturesBtn" onclick="FuturesWidget.execute()">OPEN POSITION</button>
-        </div>
-    </div>
-
-    <!-- BANK DRAW PANEL -->
-    <div id="bankDrawPanel" class="trade-panel" style="display: none;">
-        <div class="trade-panel-header bank">
-            <span>Draw from Line of Credit</span>
-            <button class="close-btn" onclick="BankWidget.closePanel()">&times;</button>
-        </div>
-        <div class="trade-panel-body">
-            <div class="info-row">
-                <span class="label">Available Credit:</span>
-                <span class="value positive" id="bankDrawMax">$0</span>
-            </div>
-            <div class="form-group">
-                <label>Amount to Draw ($)</label>
-                <input type="number" id="bankDrawAmount" min="1000" step="1000" value="50000" oninput="BankWidget.updateDrawCalc()">
-            </div>
-            <div class="calc-section">
-                <div class="calc-row">
-                    <span>New Practice Funds:</span>
-                    <span id="bankDrawNewFunds">$0</span>
-                </div>
-                <div class="calc-row">
-                    <span>New LOC Balance:</span>
-                    <span id="bankDrawNewLoc">$0</span>
-                </div>
-                <div class="calc-row total">
-                    <span>Est. Monthly Interest:</span>
-                    <span id="bankDrawInterest">$0</span>
-                </div>
-            </div>
-            <button id="executeBankDrawBtn" onclick="BankWidget.executeDraw()">DRAW FUNDS</button>
-        </div>
-    </div>
-
-    <!-- BANK REPAY PANEL -->
-    <div id="bankRepayPanel" class="trade-panel" style="display: none;">
-        <div class="trade-panel-header bank repay">
-            <span>Repay Line of Credit</span>
-            <button class="close-btn" onclick="BankWidget.closePanel()">&times;</button>
-        </div>
-        <div class="trade-panel-body">
-            <div class="info-row">
-                <span class="label">Outstanding Balance:</span>
-                <span class="value negative" id="bankRepayOutstanding">$0</span>
-            </div>
-            <div class="info-row">
-                <span class="label">Max Repayment:</span>
-                <span class="value" id="bankRepayMax">$0</span>
-            </div>
-            <div class="form-group">
-                <label>Amount to Repay ($)</label>
-                <input type="number" id="bankRepayAmount" min="1000" step="1000" value="50000" oninput="BankWidget.updateRepayCalc()">
-            </div>
-            <div class="calc-section">
-                <div class="calc-row">
-                    <span>New Practice Funds:</span>
-                    <span id="bankRepayNewFunds">$0</span>
-                </div>
-                <div class="calc-row">
-                    <span>New LOC Balance:</span>
-                    <span id="bankRepayNewLoc">$0</span>
-                </div>
-                <div class="calc-row total">
-                    <span>Monthly Interest Savings:</span>
-                    <span id="bankRepaySavings" class="positive">$0</span>
-                </div>
-            </div>
-            <button id="executeBankRepayBtn" onclick="BankWidget.executeRepay()">REPAY LOAN</button>
         </div>
     </div>
 
@@ -1225,7 +1127,7 @@
     <script src="js/core/scenario-loader.js?v=1"></script>
 
     <!-- Main Application Script (cache-bust) -->
-    <script src="js/app.js?v=21"></script>
+    <script src="js/app.js?v=22"></script>
 
     <!-- Enhanced Debug Panel (Development Only) -->
     <script src="js/debug/debug-panel.js?v=5"></script>

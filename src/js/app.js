@@ -409,11 +409,8 @@ const TimeManager = {
 // ============================================================
 
 const GAME_STATE = {
-    // Finances
+    // Finances (cash-only, no LOC)
     practiceFunds: 200000,
-    lineOfCredit: 200000,
-    locUsed: 0,
-    locInterestRate: 0.0036, // 0.36% monthly
 
     // Positions
     physicalPositions: [],
@@ -422,7 +419,6 @@ const GAME_STATE = {
     // Tracking
     totalPL: 0,
     inventory: 0,
-    totalInterestPaid: 0,
 
     // Monthly Purchase Limits (MT) - reset at month boundaries
     monthlyPurchaseLimits: {
@@ -488,12 +484,11 @@ const GAME_STATE = {
             // Load all month data from ScenarioLoader
             this.allMonthData = ScenarioLoader.getAllMonthData();
 
-            // Apply scenario settings
+            // Apply scenario settings (cash-only)
             const settings = ScenarioLoader.getSettings();
             if (settings) {
-                this.cash = settings.startingFunds || 200000;
-                this.locLimit = settings.locLimit || 200000;
-                console.log('[GAME] Applied settings - Cash:', this.cash, 'LOC:', this.locLimit);
+                this.practiceFunds = settings.startingFunds || 200000;
+                console.log('[GAME] Applied settings - Funds:', this.practiceFunds);
             }
         } else {
             // Fallback: Load from global variables (default behavior)
@@ -580,44 +575,22 @@ const GAME_STATE = {
     },
 
     /**
-     * Update header displays
+     * Update displays (sidebar metrics)
      */
     updateHeader() {
-        // Period - using TimeManager
-        document.getElementById('headerPeriod').textContent = TimeManager.getDisplayString();
+        // Update sidebar metrics
+        const periodEl = document.getElementById('sidebarPeriod');
+        const fundsEl = document.getElementById('sidebarFunds');
+        const plEl = document.getElementById('sidebarPL');
+        const inventoryEl = document.getElementById('sidebarInventory');
 
-        // Funds
-        document.getElementById('headerFunds').textContent = this.formatCurrency(this.practiceFunds);
-
-        // P&L
-        const plEl = document.getElementById('headerPL');
-        plEl.textContent = this.formatCurrency(this.totalPL);
-        plEl.className = this.totalPL >= 0 ? 'value positive' : 'value negative';
-
-        // Buying Power (Funds + Available LOC)
-        const availableLOC = this.lineOfCredit - this.locUsed;
-        const buyingPower = this.practiceFunds + availableLOC;
-        document.getElementById('headerBuyingPower').textContent = this.formatCurrency(buyingPower);
-
-        // Inventory
-        document.getElementById('headerInventory').textContent = `${this.inventory} MT`;
-
-        // LOC
-        document.getElementById('headerLOC').textContent =
-            `${this.formatCurrency(this.locUsed)} / $200K`;
-
-        // QP Pending indicator
-        const pendingQP = this.salesPendingQP || [];
-        const qpMetric = document.getElementById('headerQPMetric');
-        const qpPending = document.getElementById('headerQPPending');
-        if (qpMetric && qpPending) {
-            if (pendingQP.length > 0) {
-                qpMetric.style.display = 'flex';
-                qpPending.textContent = `${pendingQP.length} sale${pendingQP.length > 1 ? 's' : ''}`;
-            } else {
-                qpMetric.style.display = 'none';
-            }
+        if (periodEl) periodEl.textContent = TimeManager.getDisplayString();
+        if (fundsEl) fundsEl.textContent = this.formatCurrency(this.practiceFunds);
+        if (plEl) {
+            plEl.textContent = this.formatCurrency(this.totalPL);
+            plEl.className = 'metric-value ' + (this.totalPL >= 0 ? 'positive' : 'negative');
         }
+        if (inventoryEl) inventoryEl.textContent = `${this.inventory} MT`;
     },
 
     /**
@@ -653,9 +626,6 @@ const GAME_STATE = {
             this.updateCurrentMonthData();
             console.log('[GAME] New month:', result.details.monthName);
 
-            // Charge LOC interest at month boundaries
-            this.chargeLOCInterest();
-
             // Reset monthly purchase/sales limits
             this.resetMonthlyLimits();
 
@@ -679,7 +649,6 @@ const GAME_STATE = {
         FuturesWidget.render();
         AnalyticsWidget.render();
         HedgeStatusWidget.render();
-        if (typeof BankWidget !== 'undefined') BankWidget.render();
 
         console.log('[GAME] Now on Turn', TimeManager.currentTurn, '-', result.details.monthName, result.details.periodName);
 
@@ -689,33 +658,6 @@ const GAME_STATE = {
         // Update debug panels
         if (typeof DebugPanel !== 'undefined') DebugPanel.update();
         if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-    },
-
-    /**
-     * Charge LOC interest at month boundaries
-     */
-    chargeLOCInterest() {
-        if (this.locUsed <= 0) return;
-
-        const interest = Math.round(this.locUsed * this.locInterestRate);
-        this.locUsed += interest;
-        this.totalInterestPaid += interest;
-
-        const monthName = TimeManager.getMonthPeriod().monthName;
-        console.log(`[GAME] LOC Interest charged: $${interest.toLocaleString()}`);
-
-        // Send interest notification
-        NotificationManager.add(
-            'interest',
-            'Monthly Interest Charged',
-            `LOC interest of $${interest.toLocaleString()} has been charged for ${monthName}.`,
-            '🏦'
-        );
-
-        // Check if LOC exceeded limit
-        if (this.locUsed > this.lineOfCredit) {
-            alert(`Warning: LOC exceeded! Used: $${this.locUsed.toLocaleString()} / Limit: $${this.lineOfCredit.toLocaleString()}`);
-        }
     },
 
     /**
@@ -812,14 +754,8 @@ const GAME_STATE = {
                 // Cost increase = we owe more = deduct from funds
                 // Cost decrease = we overpaid = refund to funds
                 if (costAdjustment > 0) {
-                    // Cost went up - deduct additional from funds/LOC
-                    if (costAdjustment <= this.practiceFunds) {
-                        this.practiceFunds -= costAdjustment;
-                    } else {
-                        const fromLOC = costAdjustment - this.practiceFunds;
-                        this.practiceFunds = 0;
-                        this.locUsed += fromLOC;
-                    }
+                    // Cost went up - deduct additional from funds
+                    this.practiceFunds -= costAdjustment;
                 } else {
                     // Cost went down - refund to funds
                     this.practiceFunds += Math.abs(costAdjustment);
@@ -1059,9 +995,8 @@ const GAME_STATE = {
         const provisionalPricePerMT = provisionalBasePrice + premium + freight;
         const provisionalTotalCost = provisionalPricePerMT * tonnage;
 
-        // Check funds (based on provisional cost)
-        const availableFunds = this.practiceFunds + (this.lineOfCredit - this.locUsed);
-        if (provisionalTotalCost > availableFunds) {
+        // Check funds (cash-only)
+        if (provisionalTotalCost > this.practiceFunds) {
             alert('Insufficient funds!');
             return false;
         }
@@ -1069,14 +1004,8 @@ const GAME_STATE = {
         // Update monthly purchase limit
         this.monthlyPurchaseLimits[portKey].used += tonnage;
 
-        // Deduct provisional funds
-        if (provisionalTotalCost <= this.practiceFunds) {
-            this.practiceFunds -= provisionalTotalCost;
-        } else {
-            const fromLOC = provisionalTotalCost - this.practiceFunds;
-            this.practiceFunds = 0;
-            this.locUsed += fromLOC;
-        }
+        // Deduct funds
+        this.practiceFunds -= provisionalTotalCost;
 
         // Calculate travel time using TimeManager
         const travelDays = destData.TRAVEL_TIME_DAYS;
@@ -1333,6 +1262,7 @@ const GAME_STATE = {
 
     /**
      * Open futures position
+     * Flat $25 fee per contract, no margin required
      */
     openFutures(exchange, contract, direction, contracts) {
         console.log('[FUTURES] Opening', direction, contracts, 'contracts on', exchange, contract);
@@ -1341,20 +1271,17 @@ const GAME_STATE = {
         const price = exchange === 'LME' ?
             data.PRICING.LME[contract] : data.PRICING.COMEX[contract];
 
-        const marginPerContract = 9000;
         const feePerContract = 25;
-        const totalMargin = marginPerContract * contracts;
         const totalFees = feePerContract * contracts;
-        const totalDeducted = totalMargin + totalFees;
 
-        // Check funds
-        if (totalDeducted > this.practiceFunds) {
-            alert('Insufficient funds for margin!');
+        // Check funds for fee
+        if (totalFees > this.practiceFunds) {
+            alert('Insufficient funds for fees!');
             return false;
         }
 
-        // Deduct margin
-        this.practiceFunds -= totalDeducted;
+        // Deduct fee only (no margin)
+        this.practiceFunds -= totalFees;
 
         // Get current time info
         const timeInfo = TimeManager.getMonthPeriod();
@@ -1367,7 +1294,6 @@ const GAME_STATE = {
             direction: direction,
             contracts: contracts,
             entryPrice: price,
-            margin: totalMargin,
             fees: totalFees,
             openTurn: TimeManager.currentTurn,
             openMonth: timeInfo.monthName,
@@ -1394,6 +1320,7 @@ const GAME_STATE = {
 
     /**
      * Close futures position
+     * Returns P&L only (no margin to return)
      */
     closeFutures(positionId) {
         const position = this.futuresPositions.find(p => p.id === positionId);
@@ -1405,14 +1332,14 @@ const GAME_STATE = {
             data.PRICING.COMEX[position.contract];
 
         // Calculate P&L
-        const contractSize = position.exchange === 'LME' ? 25 : 25; // 25 MT per contract
+        const contractSize = 25; // 25 MT per contract
         const priceDiff = position.direction === 'LONG' ?
             currentPrice - position.entryPrice :
             position.entryPrice - currentPrice;
         const pl = priceDiff * contractSize * position.contracts;
 
-        // Return margin + P&L
-        this.practiceFunds += position.margin + pl;
+        // Return P&L only (no margin was held)
+        this.practiceFunds += pl;
         this.totalPL += pl;
 
         position.status = 'CLOSED';
@@ -2066,17 +1993,14 @@ const FuturesWidget = {
     },
 
     /**
-     * Update calculation
+     * Update calculation (flat $25 fee per contract, no margin)
      */
     updateCalc() {
         const contracts = parseInt(document.getElementById('futuresContracts').value) || 1;
-        const margin = contracts * 9000;
         const fees = contracts * 25;
-        const total = margin + fees;
 
-        document.getElementById('futuresMargin').textContent = '$' + margin.toLocaleString();
         document.getElementById('futuresFees').textContent = '$' + fees.toLocaleString();
-        document.getElementById('futuresTotal').textContent = '$' + total.toLocaleString();
+        document.getElementById('futuresTotal').textContent = '$' + fees.toLocaleString();
     },
 
     /**
@@ -2440,10 +2364,6 @@ const AnalyticsWidget = {
 
             unrealizedPnL += (estimatedRevenue - cost);
         });
-
-        // Subtract interest paid
-        const interestPaid = GAME_STATE.totalInterestPaid || 0;
-        realizedPnL -= interestPaid;
 
         return {
             realized: Math.round(realizedPnL),
@@ -3090,221 +3010,7 @@ const SidebarManager = {
 
 
 // ============================================================
-// SECTION 10: BANK WIDGET (LOC Management)
-// ============================================================
-
-const BankWidget = {
-    /**
-     * Render the bank widget in sidebar or dedicated panel
-     */
-    render() {
-        const container = document.getElementById('bankContent');
-        if (!container) return;
-
-        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
-        const utilizationPercent = ((GAME_STATE.locUsed / GAME_STATE.lineOfCredit) * 100).toFixed(1);
-
-        let html = `
-            <div class="bank-section">
-                <h4>LINE OF CREDIT</h4>
-                <div class="bank-stats">
-                    <div class="stat-row">
-                        <span class="label">Credit Limit:</span>
-                        <span class="value">$${GAME_STATE.lineOfCredit.toLocaleString()}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Used:</span>
-                        <span class="value ${GAME_STATE.locUsed > 0 ? 'negative' : ''}">$${GAME_STATE.locUsed.toLocaleString()}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Available:</span>
-                        <span class="value positive">$${locAvailable.toLocaleString()}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Utilization:</span>
-                        <span class="value">${utilizationPercent}%</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Interest Rate:</span>
-                        <span class="value">${(GAME_STATE.locInterestRate * 100).toFixed(2)}% / month</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="label">Total Interest Paid:</span>
-                        <span class="value negative">$${GAME_STATE.totalInterestPaid.toLocaleString()}</span>
-                    </div>
-                </div>
-
-                <div class="bank-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${Math.min(utilizationPercent, 100)}%"></div>
-                    </div>
-                </div>
-
-                <div class="bank-actions">
-                    <button class="bank-btn draw" onclick="BankWidget.openDrawPanel()" ${locAvailable <= 0 ? 'disabled' : ''}>
-                        DRAW FUNDS
-                    </button>
-                    <button class="bank-btn repay" onclick="BankWidget.openRepayPanel()" ${GAME_STATE.locUsed <= 0 ? 'disabled' : ''}>
-                        REPAY LOAN
-                    </button>
-                </div>
-
-                <div class="bank-note">
-                    <small>Interest charged at end of each month on outstanding balance.</small>
-                </div>
-            </div>
-        `;
-
-        container.innerHTML = html;
-    },
-
-    /**
-     * Open draw funds panel
-     */
-    openDrawPanel() {
-        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
-        if (locAvailable <= 0) {
-            alert('No credit available to draw!');
-            return;
-        }
-
-        document.getElementById('bankDrawMax').textContent = '$' + locAvailable.toLocaleString();
-        document.getElementById('bankDrawAmount').max = locAvailable;
-        document.getElementById('bankDrawAmount').value = Math.min(50000, locAvailable);
-        this.updateDrawCalc();
-
-        document.getElementById('bankDrawPanel').style.display = 'block';
-    },
-
-    /**
-     * Update draw calculation
-     */
-    updateDrawCalc() {
-        const amount = parseInt(document.getElementById('bankDrawAmount').value) || 0;
-        const newFunds = GAME_STATE.practiceFunds + amount;
-        const newLocUsed = GAME_STATE.locUsed + amount;
-        const monthlyInterest = Math.round(newLocUsed * GAME_STATE.locInterestRate);
-
-        document.getElementById('bankDrawNewFunds').textContent = '$' + newFunds.toLocaleString();
-        document.getElementById('bankDrawNewLoc').textContent = '$' + newLocUsed.toLocaleString();
-        document.getElementById('bankDrawInterest').textContent = '$' + monthlyInterest.toLocaleString() + '/month';
-    },
-
-    /**
-     * Execute draw
-     */
-    executeDraw() {
-        const amount = parseInt(document.getElementById('bankDrawAmount').value) || 0;
-        const locAvailable = GAME_STATE.lineOfCredit - GAME_STATE.locUsed;
-
-        if (amount <= 0) {
-            alert('Please enter a valid amount!');
-            return;
-        }
-
-        if (amount > locAvailable) {
-            alert('Amount exceeds available credit!');
-            return;
-        }
-
-        // Transfer from LOC to practice funds
-        GAME_STATE.locUsed += amount;
-        GAME_STATE.practiceFunds += amount;
-
-        console.log(`[BANK] Drew $${amount.toLocaleString()} from LOC`);
-
-        // Close panel and update displays
-        this.closePanel();
-        GAME_STATE.updateHeader();
-        this.render();
-        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
-        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-
-        alert(`Successfully drew $${amount.toLocaleString()} from Line of Credit!`);
-    },
-
-    /**
-     * Open repay panel
-     */
-    openRepayPanel() {
-        if (GAME_STATE.locUsed <= 0) {
-            alert('No outstanding balance to repay!');
-            return;
-        }
-
-        const maxRepay = Math.min(GAME_STATE.practiceFunds, GAME_STATE.locUsed);
-        document.getElementById('bankRepayOutstanding').textContent = '$' + GAME_STATE.locUsed.toLocaleString();
-        document.getElementById('bankRepayMax').textContent = '$' + maxRepay.toLocaleString();
-        document.getElementById('bankRepayAmount').max = maxRepay;
-        document.getElementById('bankRepayAmount').value = Math.min(maxRepay, GAME_STATE.locUsed);
-        this.updateRepayCalc();
-
-        document.getElementById('bankRepayPanel').style.display = 'block';
-    },
-
-    /**
-     * Update repay calculation
-     */
-    updateRepayCalc() {
-        const amount = parseInt(document.getElementById('bankRepayAmount').value) || 0;
-        const newFunds = GAME_STATE.practiceFunds - amount;
-        const newLocUsed = GAME_STATE.locUsed - amount;
-        const monthlyInterest = Math.round(newLocUsed * GAME_STATE.locInterestRate);
-
-        document.getElementById('bankRepayNewFunds').textContent = '$' + newFunds.toLocaleString();
-        document.getElementById('bankRepayNewLoc').textContent = '$' + newLocUsed.toLocaleString();
-        document.getElementById('bankRepaySavings').textContent = '$' + Math.round(amount * GAME_STATE.locInterestRate).toLocaleString() + '/month';
-    },
-
-    /**
-     * Execute repay
-     */
-    executeRepay() {
-        const amount = parseInt(document.getElementById('bankRepayAmount').value) || 0;
-
-        if (amount <= 0) {
-            alert('Please enter a valid amount!');
-            return;
-        }
-
-        if (amount > GAME_STATE.practiceFunds) {
-            alert('Insufficient funds to repay!');
-            return;
-        }
-
-        if (amount > GAME_STATE.locUsed) {
-            alert('Amount exceeds outstanding balance!');
-            return;
-        }
-
-        // Transfer from practice funds to LOC
-        GAME_STATE.practiceFunds -= amount;
-        GAME_STATE.locUsed -= amount;
-
-        console.log(`[BANK] Repaid $${amount.toLocaleString()} to LOC`);
-
-        // Close panel and update displays
-        this.closePanel();
-        GAME_STATE.updateHeader();
-        this.render();
-        if (typeof DebugPanel !== 'undefined') DebugPanel.update();
-        if (typeof EnhancedDebugPanel !== 'undefined') EnhancedDebugPanel.update();
-
-        alert(`Successfully repaid $${amount.toLocaleString()} to Line of Credit!`);
-    },
-
-    /**
-     * Close panels
-     */
-    closePanel() {
-        document.getElementById('bankDrawPanel').style.display = 'none';
-        document.getElementById('bankRepayPanel').style.display = 'none';
-    }
-};
-
-
-// ============================================================
-// SECTION 11: DEBUG PANEL
+// SECTION 10: DEBUG PANEL
 // ============================================================
 
 const DebugPanel = {
@@ -3372,22 +3078,16 @@ Month:          ${timeInfo.monthName} (index: ${timeInfo.monthIndex})
 Period:         ${timeInfo.periodName} (${timeInfo.period}/2)
 Display:        ${TimeManager.getDisplayString()}
 Remaining:      ${TimeManager.getRemainingTurns()} turns
-Month Boundary: ${TimeManager.isMonthBoundary() ? 'YES (interest will charge on next turn)' : 'No'}
+Month Boundary: ${TimeManager.isMonthBoundary() ? 'YES' : 'No'}
 </pre>
 </div>
 
 <div class="debug-section">
 <h4>💰 FINANCIAL</h4>
 <pre>
-Practice Funds: $${GAME_STATE.practiceFunds.toLocaleString()}
-LOC Limit:      $${GAME_STATE.lineOfCredit.toLocaleString()}
-LOC Used:       $${GAME_STATE.locUsed.toLocaleString()}
-LOC Available:  $${(GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
-Buying Power:   $${(GAME_STATE.practiceFunds + GAME_STATE.lineOfCredit - GAME_STATE.locUsed).toLocaleString()}
-Total P&L:      $${GAME_STATE.totalPL.toLocaleString()}
-Interest Paid:  $${GAME_STATE.totalInterestPaid.toLocaleString()}
-Interest Rate:  ${(GAME_STATE.locInterestRate * 100).toFixed(2)}% monthly
-Inventory:      ${GAME_STATE.inventory} MT
+Funds:     $${GAME_STATE.practiceFunds.toLocaleString()}
+Total P&L: $${GAME_STATE.totalPL.toLocaleString()}
+Inventory: ${GAME_STATE.inventory} MT
 </pre>
 </div>
 
@@ -3910,7 +3610,6 @@ document.addEventListener('DOMContentLoaded', () => {
     MarketsWidget.render();
     PositionsWidget.render();
     AnalyticsWidget.render();
-    BankWidget.render();
     HedgeStatusWidget.render();
 
     // Initialize map
