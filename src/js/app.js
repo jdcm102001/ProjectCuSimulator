@@ -3075,14 +3075,18 @@ const TabManager = {
                 break;
             case 'Analytics':
                 // Show analytics, hide hedge status
-                document.getElementById('analyticsContainer').style.display = 'block';
-                document.getElementById('hedgeStatusContainer').style.display = 'none';
+                const analyticsEl = document.getElementById('analyticsContainer');
+                const hedgeStatusEl = document.getElementById('hedgeStatusContainer');
+                if (analyticsEl) analyticsEl.style.display = 'block';
+                if (hedgeStatusEl) hedgeStatusEl.style.display = 'none';
                 AnalyticsWidget.render();
                 break;
             case 'HedgeStatus':
                 // Show hedge status, hide analytics
-                document.getElementById('analyticsContainer').style.display = 'none';
-                document.getElementById('hedgeStatusContainer').style.display = 'block';
+                const analyticsEl2 = document.getElementById('analyticsContainer');
+                const hedgeStatusEl2 = document.getElementById('hedgeStatusContainer');
+                if (analyticsEl2) analyticsEl2.style.display = 'none';
+                if (hedgeStatusEl2) hedgeStatusEl2.style.display = 'block';
                 HedgeStatusWidget.render();
                 break;
             case 'Map':
