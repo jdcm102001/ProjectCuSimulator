@@ -38,14 +38,14 @@ window.MAY_DATA = {
       "SPOT_AVG": 9550,
       "FUTURES_1M": 9680,
       "FUTURES_3M": 9850,
-      "FUTURES_12M": 10200,
+      "FUTURES_6M": 10200,
       "CURVE_STRUCTURE": "Strong Contango"
     },
     "COMEX": {
       "SPOT_AVG": 10455,
       "FUTURES_1M": 10585,
       "FUTURES_3M": 10755,
-      "FUTURES_12M": 11105,
+      "FUTURES_6M": 11105,
       "CURVE_STRUCTURE": "Strong Contango"
     },
     "M_PLUS_1": {

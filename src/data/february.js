@@ -38,14 +38,14 @@ window.FEBRUARY_DATA = {
       "SPOT_AVG": 9284,
       "FUTURES_1M": 9394,
       "FUTURES_3M": 9564,
-      "FUTURES_12M": 9934,
+      "FUTURES_6M": 9934,
       "CURVE_STRUCTURE": "Strong Contango"
     },
     "COMEX": {
       "SPOT_AVG": 10049,
       "FUTURES_1M": 10159,
       "FUTURES_3M": 10329,
-      "FUTURES_12M": 10699,
+      "FUTURES_6M": 10699,
       "CURVE_STRUCTURE": "Strong Contango"
     },
     "M_PLUS_1": {
