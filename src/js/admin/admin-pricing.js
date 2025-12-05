@@ -47,6 +47,23 @@ const AdminPricing = {
     },
 
     /**
+     * Helper function to draw rounded rectangles (roundRect is not standard Canvas API)
+     */
+    drawRoundedRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    },
+
+    /**
      * Initialize the pricing module
      */
     init(simData) {
@@ -594,8 +611,7 @@ const AdminPricing = {
 
         // Background
         ctx.fillStyle = this.colors[this.dragPoint.exchange];
-        ctx.beginPath();
-        ctx.roundRect(x - labelWidth / 2, y - 35, labelWidth, 25, 4);
+        this.drawRoundedRect(ctx, x - labelWidth / 2, y - 35, labelWidth, 25, 4);
         ctx.fill();
 
         // Text

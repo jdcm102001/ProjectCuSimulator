@@ -32,8 +32,13 @@ const NotificationManager = {
 
     /**
      * Bind event listeners
+     * Fixed: Added flag to prevent multiple bindings (memory leak prevention)
      */
     bindEvents() {
+        // Prevent multiple bindings
+        if (this._eventsBound) return;
+        this._eventsBound = true;
+
         const bell = document.getElementById('notificationBell');
         if (bell) {
             bell.addEventListener('click', (e) => {
@@ -584,11 +589,22 @@ const GAME_STATE = {
         const plEl = document.getElementById('sidebarPL');
         const inventoryEl = document.getElementById('sidebarInventory');
 
+        // Calculate unrealized futures P&L
+        const unrealizedFuturesPL = this.futuresPositions
+            .filter(f => f.status === 'OPEN')
+            .reduce((sum, f) => sum + (f.unrealizedPL || 0), 0);
+
+        // Total P&L includes realized + unrealized futures
+        const totalPLWithFutures = this.totalPL + unrealizedFuturesPL;
+
         if (periodEl) periodEl.textContent = TimeManager.getDisplayString();
         if (fundsEl) fundsEl.textContent = this.formatCurrency(this.practiceFunds);
         if (plEl) {
-            plEl.textContent = this.formatCurrency(this.totalPL);
-            plEl.className = 'metric-value ' + (this.totalPL >= 0 ? 'positive' : 'negative');
+            // Show total P&L including unrealized futures
+            plEl.textContent = this.formatCurrency(totalPLWithFutures);
+            plEl.className = 'metric-value ' + (totalPLWithFutures >= 0 ? 'positive' : 'negative');
+            // Add title tooltip showing breakdown
+            plEl.title = `Realized: ${this.formatCurrency(this.totalPL)}\nUnrealized Futures: ${this.formatCurrency(unrealizedFuturesPL)}`;
         }
         if (inventoryEl) inventoryEl.textContent = `${this.inventory} MT`;
     },
@@ -636,6 +652,9 @@ const GAME_STATE = {
 
         // Mark futures positions for settlement
         this.settleFutures();
+
+        // Check for futures expiring while physical still in transit
+        this.checkFuturesExpiryWarnings();
 
         // Generate new period offers (simplified market)
         this.generatePeriodOffers();
@@ -709,7 +728,7 @@ const GAME_STATE = {
             return;
         }
 
-        const qpMonthName = TimeManager.MONTHS[qpMonthToReveal];
+        const qpMonthName = TimeManager.MONTHS[qpMonthToReveal] || 'Beyond June';
         const monthName = TimeManager.getMonthPeriod().monthName;
         let totalPurchaseAdjustment = 0;
         let totalSaleAdjustment = 0;
@@ -794,8 +813,9 @@ const GAME_STATE = {
             });
 
             // Remove processed purchases from pending
+            // Keep items that are BOTH: not for this reveal month AND not yet revealed
             this.purchasesPendingQP = this.purchasesPendingQP.filter(
-                p => p.qpMonthIndex !== qpMonthToReveal || !p.qpRevealed
+                p => p.qpMonthIndex !== qpMonthToReveal && !p.qpRevealed
             );
         }
 
@@ -862,8 +882,9 @@ const GAME_STATE = {
             });
 
             // Remove processed sales from pending
+            // Keep items that are BOTH: not for this reveal month AND not yet revealed
             this.salesPendingQP = this.salesPendingQP.filter(
-                sale => sale.qpMonthIndex !== qpMonthToReveal || !sale.qpRevealed
+                sale => sale.qpMonthIndex !== qpMonthToReveal && !sale.qpRevealed
             );
         }
 
@@ -1147,6 +1168,40 @@ const GAME_STATE = {
             return false;
         }
 
+        // Check for linked futures positions (hedges)
+        const linkedFutures = this.futuresPositions.filter(
+            f => f.linkedPhysicalId === positionId && f.status === 'OPEN'
+        );
+
+        if (linkedFutures.length > 0) {
+            const hedgeTonnage = linkedFutures.reduce((sum, f) => sum + (f.contracts * 25), 0);
+            const futuresDetails = linkedFutures.map(f =>
+                `${f.exchange} ${f.contract} ${f.direction} x${f.contracts} (${f.contracts * 25} MT)`
+            ).join('\n');
+
+            const closeHedges = confirm(
+                `This position has linked hedge(s):\n${futuresDetails}\n\n` +
+                `Total hedged: ${hedgeTonnage} MT\n\n` +
+                `Do you want to close the linked futures positions?\n\n` +
+                `[OK] = Close futures and realize hedge P&L\n` +
+                `[Cancel] = Keep futures open (unlinks from this position)`
+            );
+
+            if (closeHedges) {
+                // Close all linked futures
+                linkedFutures.forEach(f => {
+                    const pl = this.closeFutures(f.id);
+                    console.log(`[HEDGE] Auto-closed linked futures ${f.id} with P&L: $${pl}`);
+                });
+            } else {
+                // Unlink futures from this position
+                linkedFutures.forEach(f => {
+                    f.linkedPhysicalId = null;
+                    console.log(`[HEDGE] Unlinked futures ${f.id} from physical ${positionId}`);
+                });
+            }
+        }
+
         const data = this.currentMonthData;
         const buyerData = data.CLIENTS.OPPORTUNITIES[buyerIndex];
         const timeInfo = TimeManager.getMonthPeriod();
@@ -1379,6 +1434,78 @@ const GAME_STATE = {
 
             pos.unrealizedPL = priceDiff * contractSize * pos.contracts;
             pos.currentPrice = currentPrice;
+        });
+    },
+
+    /**
+     * Calculate net exposure (physical tonnage minus hedged tonnage)
+     * Positive = net long (exposed to price drops)
+     * Negative = net short (exposed to price rises)
+     * Zero = fully hedged
+     */
+    calculateNetExposure() {
+        // Physical positions = long copper exposure
+        const physicalLong = this.physicalPositions
+            .filter(p => p.status !== 'SOLD')
+            .reduce((sum, p) => sum + (p.tonnage || 0), 0);
+
+        // SHORT futures offset physical long exposure
+        const futuresShort = this.futuresPositions
+            .filter(f => f.status === 'OPEN' && f.direction === 'SHORT')
+            .reduce((sum, f) => sum + (f.contracts * 25), 0);
+
+        // LONG futures add to long exposure
+        const futuresLong = this.futuresPositions
+            .filter(f => f.status === 'OPEN' && f.direction === 'LONG')
+            .reduce((sum, f) => sum + (f.contracts * 25), 0);
+
+        const netExposure = physicalLong - futuresShort + futuresLong;
+
+        return {
+            physical: physicalLong,
+            futuresShort: futuresShort,
+            futuresLong: futuresLong,
+            net: netExposure,
+            hedgeRatio: physicalLong > 0 ? Math.round((futuresShort / physicalLong) * 100) : 0
+        };
+    },
+
+    /**
+     * Check for futures positions expiring while linked physical is still in transit
+     * Warns user before hedge expires, leaving physical unhedged
+     */
+    checkFuturesExpiryWarnings() {
+        const currentTurn = TimeManager.currentTurn;
+        const timeInfo = TimeManager.getMonthPeriod();
+
+        // Futures expire at Late period of their contract month
+        // Check if we're at a Late period (potential expiry point)
+        if (timeInfo.period !== 2) return;
+
+        this.futuresPositions.forEach(futures => {
+            if (futures.status !== 'OPEN' || !futures.linkedPhysicalId) return;
+
+            // Find linked physical position
+            const physical = this.physicalPositions.find(p => p.id === futures.linkedPhysicalId);
+            if (!physical || physical.status === 'SOLD') return;
+
+            // Check if physical is still in transit
+            if (physical.status === 'IN_TRANSIT') {
+                // Check if futures expires this turn (contract month matches current month)
+                const contractMonth = futures.contract; // e.g., 'MAR_24'
+                const currentMonthShort = timeInfo.monthName.substring(0, 3).toUpperCase();
+
+                if (contractMonth && contractMonth.startsWith(currentMonthShort)) {
+                    // Futures is expiring but physical still in transit!
+                    NotificationManager.add(
+                        'hedge-expiry-warning',
+                        'Hedge Expiry Warning',
+                        `Futures ${futures.id} (${futures.exchange} ${futures.contract}) is expiring this turn, but linked physical ${physical.id} is still in transit (arrives Turn ${physical.arrivalTurn}). Consider rolling the hedge.`,
+                        '⚠️'
+                    );
+                    console.log(`[HEDGE WARNING] Futures ${futures.id} expiring while physical ${physical.id} still in transit`);
+                }
+            }
         });
     },
 
@@ -2338,10 +2465,10 @@ const AnalyticsWidget = {
         // Check completed sales (QP revealed)
         const completedSales = GAME_STATE.salesCompleted || [];
         completedSales.forEach(sale => {
-            // Revenue from sale minus original cost
-            const revenue = sale.actualTotalRevenue || sale.totalRevenue || 0;
-            const cost = sale.originalCost || 0;
-            realizedPnL += (revenue - cost);
+            // Use actual profit directly (already calculated as actualRevenue - costBasis)
+            // Field names: actualRevenue, actualProfit, costBasis (NOT actualTotalRevenue, originalCost)
+            const profit = sale.actualProfit || (sale.actualRevenue - sale.costBasis) || 0;
+            realizedPnL += profit;
         });
 
         // Check pending sales (not yet QP revealed)
@@ -2363,6 +2490,18 @@ const AnalyticsWidget = {
             const cost = sale.costBasis || (sale.tonnage * (sale.pricePerMT || 0));
 
             unrealizedPnL += (estimatedRevenue - cost);
+        });
+
+        // ========== FUTURES P&L ==========
+        const futuresPositions = GAME_STATE.futuresPositions || [];
+        futuresPositions.forEach(f => {
+            if (f.status === 'OPEN') {
+                // Open futures contribute to unrealized P&L
+                unrealizedPnL += f.unrealizedPL || 0;
+            } else if (f.status === 'CLOSED') {
+                // Closed futures contribute to realized P&L
+                realizedPnL += f.closedPL || 0;
+            }
         });
 
         return {
@@ -2438,15 +2577,18 @@ const AnalyticsWidget = {
         const positions = GAME_STATE.physicalPositions || [];
 
         const inTransit = positions
-            .filter(p => p.status === 'IN_TRANSIT')
+            .filter(p => p.status === 'IN_TRANSIT' && !p.sold)
             .reduce((sum, p) => sum + (p.tonnage || 0), 0);
 
+        // AT_PORT: Positions that have arrived but not sold
+        // Note: status becomes 'ARRIVED' when cargo arrives (AT_PORT is set in currentLocation)
         const atPort = positions
-            .filter(p => p.status === 'AT_PORT' || p.status === 'ARRIVED')
+            .filter(p => (p.status === 'AT_PORT' || p.status === 'ARRIVED') && !p.sold)
             .reduce((sum, p) => sum + (p.tonnage || 0), 0);
 
+        // SOLD: Positions that have been sold (status === 'SOLD' or sold === true)
         const sold = positions
-            .filter(p => p.sold === true)
+            .filter(p => p.sold === true || p.status === 'SOLD')
             .reduce((sum, p) => sum + (p.tonnage || 0), 0);
 
         return { inTransit, atPort, sold };
@@ -2465,7 +2607,9 @@ const AnalyticsWidget = {
             if (timing.settlements.length === 0) {
                 container.innerHTML = '<div class="analytics-empty">No pending settlements</div>';
             } else {
-                const maxCount = Math.max(...timing.settlements.map(s => s.count), 1);
+                // Fix: Math.max(...[], 1) returns -Infinity; put 1 first to ensure minimum
+                const counts = timing.settlements.map(s => s.count);
+                const maxCount = counts.length > 0 ? Math.max(1, ...counts) : 1;
                 container.innerHTML = timing.settlements
                     .map(s => this.renderBar(s.month, s.count, maxCount, 'settlement', s.count === 1 ? 'position' : 'positions'))
                     .join('');
@@ -2782,8 +2926,8 @@ const TradePanel = {
             document.getElementById('qpWarning').style.display = 'none';
         } else {
             document.getElementById('qpWarning').style.display = 'flex';
-            const qpMonth = TimeManager.MONTHS[qpMonthIndex];
-            const revealMonth = TimeManager.MONTHS[revealMonthIndex];
+            const qpMonth = TimeManager.MONTHS[qpMonthIndex] || 'N/A';
+            const revealMonth = TimeManager.MONTHS[revealMonthIndex] || 'N/A';
             document.getElementById('qpRevealDate').textContent = `${revealMonth} Early (${qpMonth} avg)`;
         }
     },
@@ -2897,7 +3041,7 @@ const TradePanel = {
             if (isJune) {
                 alert(`Sale complete!\nFinal Profit: $${profit.toLocaleString()}\n\n(June sales settle at current price)`);
             } else {
-                const qpMonth = TimeManager.MONTHS[timeInfo.monthIndex + 1];
+                const qpMonth = TimeManager.MONTHS[timeInfo.monthIndex + 1] || 'Next Month';
                 alert(`Sale recorded!\n\nEstimated Profit: $${profit.toLocaleString()}\n\nFinal price will be revealed at ${qpMonth} Early.\nProfit is subject to M+1 adjustment.`);
             }
         }
@@ -3253,27 +3397,27 @@ const HedgeStatusWidget = {
             else exposed++;
         });
 
+        // Calculate net exposure
+        const exposure = GAME_STATE.calculateNetExposure();
+        const netClass = exposure.net > 0 ? 'exposed' : exposure.net < 0 ? 'hedged' : 'hedged';
+
         return `
             <div class="hedge-summary-bar">
                 <div class="hedge-summary-item">
-                    <span class="summary-label">Positions</span>
-                    <span class="summary-value">${positions.length}</span>
+                    <span class="summary-label">Physical</span>
+                    <span class="summary-value">${exposure.physical} MT</span>
                 </div>
                 <div class="hedge-summary-item">
-                    <span class="summary-label">Deployed</span>
-                    <span class="summary-value">$${(totalDeployed/1000000).toFixed(2)}M</span>
-                </div>
-                <div class="hedge-summary-item hedged">
                     <span class="summary-label">Hedged</span>
-                    <span class="summary-value">${hedged}</span>
+                    <span class="summary-value">${exposure.futuresShort} MT</span>
                 </div>
-                <div class="hedge-summary-item exposed">
-                    <span class="summary-label">Exposed</span>
-                    <span class="summary-value">${exposed}</span>
+                <div class="hedge-summary-item ${netClass}">
+                    <span class="summary-label">Net Exposure</span>
+                    <span class="summary-value">${exposure.net >= 0 ? '+' : ''}${exposure.net} MT</span>
                 </div>
-                <div class="hedge-summary-item partial">
-                    <span class="summary-label">Partial</span>
-                    <span class="summary-value">${partial}</span>
+                <div class="hedge-summary-item ${exposure.hedgeRatio >= 80 ? 'hedged' : exposure.hedgeRatio >= 50 ? 'partial' : 'exposed'}">
+                    <span class="summary-label">Hedge Ratio</span>
+                    <span class="summary-value">${exposure.hedgeRatio}%</span>
                 </div>
             </div>
         `;
@@ -3562,13 +3706,19 @@ const HedgeStatusWidget = {
         this.pendingPhysicalId = null;
         this.pendingFuturesId = null;
 
-        // Re-render
+        // Re-render with updated exposure
         this.render();
         AnalyticsWidget.render();
 
-        // Notify
+        // Calculate and show new exposure in notification
+        const exposure = GAME_STATE.calculateNetExposure();
         if (typeof NotificationManager !== 'undefined') {
-            NotificationManager.add('hedge-linked', 'Hedge Linked', 'Futures position linked to physical', '🛡️');
+            NotificationManager.add(
+                'hedge-linked',
+                'Hedge Linked',
+                `Futures linked to physical. Net exposure: ${exposure.net >= 0 ? '+' : ''}${exposure.net} MT (${exposure.hedgeRatio}% hedged)`,
+                '🛡️'
+            );
         }
     },
 
