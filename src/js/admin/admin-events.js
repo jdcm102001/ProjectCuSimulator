@@ -95,6 +95,7 @@ const AdminEvents = {
         let cellsHtml = '';
         for (let i = 1; i <= 12; i++) {
             if (i === startCol) {
+                // Render the spanned event bar cell
                 cellsHtml += `
                     <div class="gantt-cell" style="grid-column: span ${span}; position: relative;">
                         <div id="event-bar-${event.id}"
@@ -104,10 +105,15 @@ const AdminEvents = {
                         </div>
                     </div>
                 `;
-                i += span - 1; // Skip the spanned columns
+                // Skip past spanned columns: after i += span - 1 and loop's i++,
+                // next iteration will be at endCol + 1 (correctly skipping spanned range)
+                i += span - 1;
             } else if (i < startCol || i > endCol) {
+                // Render empty cell for columns outside the event's range
                 cellsHtml += `<div class="gantt-cell"></div>`;
             }
+            // Note: No else clause for i in range (startCol, endCol] because
+            // these are skipped by the i += span - 1 above
         }
 
         return `

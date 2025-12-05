@@ -240,6 +240,11 @@ const TimelineEditor = {
    */
   xToPeriod(x) {
     const columnWidth = this.getPeriodColumnWidth();
+    // Guard against division by zero
+    if (!columnWidth || columnWidth <= 0) {
+      console.warn('[TimelineEditor] Invalid column width, defaulting to period 1');
+      return 1;
+    }
     const period = Math.floor(x / columnWidth) + 1;
     return Math.max(1, Math.min(12, period));
   },
